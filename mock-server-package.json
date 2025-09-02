@@ -1,0 +1,26 @@
+{
+  "name": "newtonbotics-mock-backend",
+  "version": "1.0.0",
+  "description": "Mock backend server for NewtonBotics admin panel testing",
+  "main": "mock-backend-server.js",
+  "scripts": {
+    "start": "node mock-backend-server.js",
+    "dev": "nodemon mock-backend-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "mock",
+    "backend",
+    "api",
+    "testing"
+  ],
+  "author": "NewtonBotics Team",
+  "license": "MIT"
+}
