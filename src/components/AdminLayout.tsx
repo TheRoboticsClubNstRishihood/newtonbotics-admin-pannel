@@ -18,7 +18,10 @@ import {
   EnvelopeIcon,
   BuildingOfficeIcon,
   TagIcon,
-  CubeIcon
+  CubeIcon,
+  ChatBubbleLeftRightIcon,
+  FolderIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 
 interface User {
@@ -85,10 +88,12 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
 
   const menuItems = [
     { name: 'Events', icon: CalendarIcon, href: '/events' },
-    { name: 'Workshops', icon: AcademicCapIcon, href: '/workshops' },
     { name: 'News', icon: NewspaperIcon, href: '/news' },
+    { name: 'Newsletter', icon: ChatBubbleLeftRightIcon, href: '/newsletter' },
+    { name: 'Projects', icon: FolderIcon, href: '/projects' },
+    { name: 'Project Requests', icon: ClipboardDocumentListIcon, href: '/project-requests' },
     { name: 'Team', icon: UserGroupIcon, href: '/team' },
-    { name: 'Gallery', icon: PhotoIcon, href: '/gallery' },
+    { name: 'Media', icon: PhotoIcon, href: '/media' },
     { name: 'Users', icon: UsersIcon, href: '/users' },
     { name: 'Contact', icon: EnvelopeIcon, href: '/contact' },
     { name: 'Role Approvals', icon: TagIcon, href: '/role-approvals' },

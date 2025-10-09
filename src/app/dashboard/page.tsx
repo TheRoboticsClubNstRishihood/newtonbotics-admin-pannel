@@ -16,7 +16,8 @@ import {
   UserCircleIcon,
   ChartBarIcon,
   ClockIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
 
@@ -39,6 +40,11 @@ interface DashboardStats {
   totalNews: number;
   totalEvents: number;
   totalWorkshops: number;
+  newsletterStats?: {
+    totalSubscriptions: number;
+    activeSubscriptions: number;
+    recentSubscriptions: number;
+  };
   recentActivity: Array<{
     id: string;
     type: string;
@@ -92,7 +98,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch('http://localhost:3005/api/auth/me', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-servers-chi.vercel.app'}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -142,14 +148,20 @@ export default function Dashboard() {
       if (!token) return;
 
       // Fetch dashboard statistics
-      const [usersResponse, newsResponse] = await Promise.all([
-        fetch('http://localhost:3005/api/users', {
+      const [usersResponse, newsResponse, newsletterResponse] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005'}/api/users`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         }),
-        fetch('http://localhost:3005/api/news', {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005'}/api/news`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/newsletter/admin/statistics', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -159,6 +171,7 @@ export default function Dashboard() {
 
       const usersData = await usersResponse.json();
       const newsData = await newsResponse.json();
+      const newsletterData = await newsletterResponse.json();
 
       // Mock stats for now - replace with actual API calls
       setStats({
@@ -166,6 +179,11 @@ export default function Dashboard() {
         totalNews: newsData.success ? newsData.data?.items?.length || 0 : 0,
         totalEvents: 5, // Mock data
         totalWorkshops: 3, // Mock data
+        newsletterStats: newsletterData.success ? {
+          totalSubscriptions: newsletterData.data.overview.totalSubscriptions,
+          activeSubscriptions: newsletterData.data.overview.activeSubscriptions,
+          recentSubscriptions: newsletterData.data.overview.recentSubscriptions
+        } : undefined,
         recentActivity: [
           {
             id: '1',
@@ -251,7 +269,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -299,6 +317,21 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {stats.newsletterStats && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-pink-100 rounded-lg">
+                  <ChatBubbleLeftRightIcon className="h-6 w-6 text-pink-600" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Newsletter Subscriptions</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.newsletterStats.totalSubscriptions}</p>
+                  <p className="text-xs text-gray-500">{stats.newsletterStats.activeSubscriptions} active</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recent Activity */}

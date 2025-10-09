@@ -73,9 +73,8 @@ export default function RoleApprovals() {
         return;
       }
 
-      // Make direct request to backend API
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
-      const url = `${backendUrl}/api/role-approvals`;
+      // Use Next.js API route instead of direct backend call
+      const url = '/api/role-approvals';
       console.log('Fetching role approvals from:', url);
       console.log('Token:', token.substring(0, 20) + '...');
       
@@ -187,9 +186,8 @@ export default function RoleApprovals() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      // Make direct request to backend API
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
-      const response = await fetch(`${backendUrl}/api/role-approvals`, {
+      // Use Next.js API route instead of direct backend call
+      const response = await fetch('/api/role-approvals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,9 +247,8 @@ export default function RoleApprovals() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      // Make direct request to backend API
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
-      const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(email)}`, {
+      // Use Next.js API route instead of direct backend call
+      const response = await fetch(`/api/role-approvals/${encodeURIComponent(email)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

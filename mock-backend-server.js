@@ -97,6 +97,15 @@ let events = [
     category: 'workshop',
     type: 'workshop',
     isFeatured: true,
+    requiresRegistration: true,
+    registrationDeadline: '2024-01-10T23:59:59.000Z',
+    registrationFormLink: 'https://forms.google.com/robotics-workshop',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176',
+    featureOptions: {
+      showInNav: true,
+      navLabel: 'Workshops',
+      navOrder: 1
+    },
     registrations: [],
     createdAt: '2023-12-01T08:00:00.000Z',
     updatedAt: '2023-12-01T08:00:00.000Z'
@@ -115,6 +124,15 @@ let events = [
     category: 'competition',
     type: 'competition',
     isFeatured: false,
+    requiresRegistration: true,
+    registrationDeadline: '2024-02-15T23:59:59.000Z',
+    registrationFormLink: 'https://forms.google.com/ai-competition',
+    imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995',
+    featureOptions: {
+      showInNav: true,
+      navLabel: 'Competitions',
+      navOrder: 2
+    },
     registrations: [],
     createdAt: '2023-12-01T08:00:00.000Z',
     updatedAt: '2023-12-01T08:00:00.000Z'
@@ -561,7 +579,23 @@ app.get('/api/events', authenticateToken, (req, res) => {
 // POST /api/events - Create Event
 app.post('/api/events', authenticateToken, (req, res) => {
   try {
-    const { title, description, startDate, endDate, location, maxCapacity, organizerId, category, type, isFeatured } = req.body;
+    const { 
+      title, 
+      description, 
+      startDate, 
+      endDate, 
+      location, 
+      maxCapacity, 
+      organizerId, 
+      category, 
+      type, 
+      isFeatured,
+      requiresRegistration,
+      registrationDeadline,
+      registrationFormLink,
+      imageUrl,
+      featureOptions
+    } = req.body;
 
     // Validation
     if (!title || !description || !startDate || !endDate || !location || !maxCapacity || !organizerId || !type) {
@@ -599,6 +633,15 @@ app.post('/api/events', authenticateToken, (req, res) => {
       category: category || null,
       type,
       isFeatured: isFeatured || false,
+      requiresRegistration: requiresRegistration || false,
+      registrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
+      registrationFormLink: registrationFormLink || null,
+      imageUrl: imageUrl || null,
+      featureOptions: {
+        showInNav: featureOptions?.showInNav || false,
+        navLabel: featureOptions?.navLabel || null,
+        navOrder: featureOptions?.navOrder || 0
+      },
       registrations: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -716,6 +759,291 @@ app.delete('/api/events/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Media Categories endpoints
+let mediaCategories = [
+  {
+    _id: '64f8a1b2c3d4e5f6a7b8c9d1',
+    name: 'Gallery',
+    description: 'General gallery images and media',
+    createdAt: '2023-09-05T08:00:00.000Z',
+    updatedAt: '2023-09-05T08:00:00.000Z'
+  },
+  {
+    _id: '64f8a1b2c3d4e5f6a7b8c9d2',
+    name: 'Projects',
+    description: 'Project-related media and documentation',
+    createdAt: '2023-09-05T08:00:00.000Z',
+    updatedAt: '2023-09-05T08:00:00.000Z'
+  }
+];
+
+// GET /api/media/categories
+app.get('/api/media/categories', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: mediaCategories
+    });
+  } catch (error) {
+    console.error('Error fetching media categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/media/categories
+app.post('/api/media/categories', (req, res) => {
+  try {
+    const { name, description, parentCategoryId } = req.body;
+
+    if (!name || name.length < 2 || name.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required and must be between 2-100 characters'
+      });
+    }
+
+    const newCategory = {
+      _id: uuidv4(),
+      name,
+      description: description || '',
+      parentCategoryId: parentCategoryId || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    mediaCategories.push(newCategory);
+
+    res.status(201).json({
+      success: true,
+      message: 'Media category created successfully',
+      data: newCategory
+    });
+  } catch (error) {
+    console.error('Error creating media category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// PUT /api/media/categories/:id
+app.put('/api/media/categories/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, parentCategoryId } = req.body;
+
+    const categoryIndex = mediaCategories.findIndex(cat => cat._id === id);
+    if (categoryIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Media category not found'
+      });
+    }
+
+    if (name && (name.length < 2 || name.length > 100)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be between 2-100 characters'
+      });
+    }
+
+    const updatedCategory = {
+      ...mediaCategories[categoryIndex],
+      ...(name && { name }),
+      ...(description !== undefined && { description }),
+      ...(parentCategoryId !== undefined && { parentCategoryId }),
+      updatedAt: new Date().toISOString()
+    };
+
+    mediaCategories[categoryIndex] = updatedCategory;
+
+    res.json({
+      success: true,
+      message: 'Media category updated successfully',
+      data: updatedCategory
+    });
+  } catch (error) {
+    console.error('Error updating media category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// DELETE /api/media/categories/:id
+app.delete('/api/media/categories/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const categoryIndex = mediaCategories.findIndex(cat => cat._id === id);
+    if (categoryIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Media category not found'
+      });
+    }
+
+    mediaCategories.splice(categoryIndex, 1);
+
+    res.json({
+      success: true,
+      message: 'Media category deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting media category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Role Approvals endpoints
+let roleApprovals = [
+  {
+    _id: '1',
+    email: 'john.doe@university.edu',
+    allowedRoles: ['student', 'team_member'],
+    note: 'Computer Science student, approved for team projects',
+    isActive: true,
+    createdBy: 'admin@newtonbotics.com',
+    updatedBy: 'admin@newtonbotics.com',
+    createdAt: '2024-01-15T10:30:00.000Z',
+    updatedAt: '2024-01-15T10:30:00.000Z'
+  },
+  {
+    _id: '2',
+    email: 'jane.smith@university.edu',
+    allowedRoles: ['mentor', 'researcher'],
+    note: 'Senior researcher, can mentor students',
+    isActive: true,
+    createdBy: 'admin@newtonbotics.com',
+    updatedBy: 'admin@newtonbotics.com',
+    createdAt: '2024-01-14T09:15:00.000Z',
+    updatedAt: '2024-01-14T09:15:00.000Z'
+  }
+];
+
+// GET /api/role-approvals
+app.get('/api/role-approvals', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        approvals: roleApprovals
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching role approvals:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/role-approvals
+app.post('/api/role-approvals', (req, res) => {
+  try {
+    const { email, allowedRoles, note, isActive = true } = req.body;
+
+    if (!email || !allowedRoles || !Array.isArray(allowedRoles)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Email and allowedRoles are required'
+        }
+      });
+    }
+
+    // Check if approval already exists
+    const existingIndex = roleApprovals.findIndex(approval => approval.email === email);
+    
+    if (existingIndex !== -1) {
+      // Update existing approval
+      roleApprovals[existingIndex] = {
+        ...roleApprovals[existingIndex],
+        allowedRoles,
+        note: note || '',
+        isActive,
+        updatedAt: new Date().toISOString()
+      };
+
+      res.json({
+        success: true,
+        data: {
+          approval: roleApprovals[existingIndex]
+        }
+      });
+    } else {
+      // Create new approval
+      const newApproval = {
+        _id: uuidv4(),
+        email,
+        allowedRoles,
+        note: note || '',
+        isActive,
+        createdBy: 'admin@newtonbotics.com',
+        updatedBy: 'admin@newtonbotics.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      roleApprovals.push(newApproval);
+
+      res.json({
+        success: true,
+        data: {
+          approval: newApproval
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error creating/updating role approval:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// DELETE /api/role-approvals/:email
+app.delete('/api/role-approvals/:email', (req, res) => {
+  try {
+    const { email } = req.params;
+    const decodedEmail = decodeURIComponent(email);
+
+    const approvalIndex = roleApprovals.findIndex(approval => approval.email === decodedEmail);
+    
+    if (approvalIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Role approval not found'
+        }
+      });
+    }
+
+    roleApprovals.splice(approvalIndex, 1);
+
+    res.json({
+      success: true,
+      message: 'Role approval deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting role approval:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -744,6 +1072,15 @@ app.listen(PORT, () => {
   console.log('- GET  /api/events/:id');
   console.log('- PUT  /api/events/:id');
   console.log('- DELETE /api/events/:id');
+  console.log('Media Categories:');
+  console.log('- GET  /api/media/categories');
+  console.log('- POST /api/media/categories');
+  console.log('- PUT  /api/media/categories/:id');
+  console.log('- DELETE /api/media/categories/:id');
+  console.log('Role Approvals:');
+  console.log('- GET  /api/role-approvals');
+  console.log('- POST /api/role-approvals');
+  console.log('- DELETE /api/role-approvals/:email');
   console.log('- GET  /api/health');
   console.log('\nUse any Bearer token for authentication (e.g., "Bearer mock-token")');
 });

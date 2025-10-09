@@ -41,6 +41,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
   const [formData, setFormData] = useState<Partial<User>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [changedFields, setChangedFields] = useState<Set<string>>(new Set());
 
   console.log('EditUserModal props:', { user, isOpen, departments, roles });
 
@@ -65,11 +66,31 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
     }
   }, [user]);
 
+  // Early return after all hooks are called
+  if (!user) {
+    console.warn('EditUserModal: No user provided');
+    return null;
+  }
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+
+    // Track changed fields
+    const originalValue = user[field as keyof typeof user];
+    const hasChanged = value !== originalValue;
+    
+    setChangedFields(prev => {
+      const newSet = new Set(prev);
+      if (hasChanged) {
+        newSet.add(field);
+      } else {
+        newSet.delete(field);
+      }
+      return newSet;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,20 +107,68 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
         return;
       }
 
-      // Clean up form data - remove undefined values and ensure proper structure
-      const cleanFormData = Object.fromEntries(
-        Object.entries(formData).filter(([_, value]) => value !== undefined && value !== null && value !== '')
-      );
+      // Only send fields that have been changed from their original values
+      const changedFields: any = {};
+      
+      // Compare current form data with original user data
+      Object.entries(formData).forEach(([key, value]) => {
+        const originalValue = user[key as keyof typeof user];
+        
+        // Check if the value has actually changed
+        if (value !== originalValue) {
+          // Handle different data types
+          if (Array.isArray(value) && Array.isArray(originalValue)) {
+            // For arrays, check if they're different
+            if (JSON.stringify(value) !== JSON.stringify(originalValue)) {
+              changedFields[key] = value;
+            }
+          } else if (typeof value === 'object' && typeof originalValue === 'object') {
+            // For objects, check if they're different
+            if (JSON.stringify(value) !== JSON.stringify(originalValue)) {
+              changedFields[key] = value;
+            }
+          } else {
+            // For primitive values, handle empty strings specially
+            if (value === '' && (originalValue === null || originalValue === undefined || originalValue === '')) {
+              // Don't send empty string if original was also empty/null/undefined
+              return;
+            }
+            
+            // Special handling for phone number - send null instead of empty string
+            if (key === 'phone' && value === '') {
+              changedFields[key] = null;
+            } else {
+              changedFields[key] = value;
+            }
+          }
+        }
+      });
 
-      console.log('Submitting form data:', cleanFormData);
+      console.log('Original user data:', user);
+      console.log('Form data:', formData);
+      console.log('Changed fields only:', changedFields);
 
-      const response = await fetch(`http://localhost:3005/api/users/${user.id}`, {
+      // Check if any fields have been changed
+      if (Object.keys(changedFields).length === 0) {
+        setError('No changes detected. Please modify at least one field before saving.');
+        return;
+      }
+
+      // Optional: Validate phone number format if provided (but don't block submission)
+      if (changedFields.phone && changedFields.phone !== null && changedFields.phone !== '') {
+        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+        if (!phoneRegex.test(changedFields.phone.replace(/[\s\-\(\)]/g, ''))) {
+          console.warn('Phone number format may be invalid, but allowing submission');
+        }
+      }
+
+      const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(cleanFormData)
+        body: JSON.stringify(changedFields)
       });
 
       console.log('Response status:', response.status);
@@ -112,7 +181,19 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
       } else {
         const errorData = await response.json();
         console.error('Error response:', errorData);
-        setError(errorData.message || `Failed to update user (${response.status})`);
+        
+        // Show more detailed error information
+        let errorMessage = errorData.message || `Failed to update user (${response.status})`;
+        
+        if (errorData.details) {
+          if (errorData.details.error?.message) {
+            errorMessage = errorData.details.error.message;
+          } else if (errorData.details.message) {
+            errorMessage = errorData.details.message;
+          }
+        }
+        
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('Error updating user:', error);
@@ -130,13 +211,31 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
   console.log('EditUserModal rendering with:', { user, formData, isOpen });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div 
+        className="fixed inset-0 z-50 overflow-y-auto"
+        style={{ 
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+          zIndex: 9999,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0
+        }}
+      >
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
 
         {/* Modal panel */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto">
+        <div 
+          className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto"
+          style={{ 
+            backgroundColor: 'white',
+            zIndex: 10000,
+            position: 'relative'
+          }}
+        >
           {/* Header */}
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-center justify-between mb-4">
@@ -148,6 +247,15 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
+
+            {/* Changed Fields Summary */}
+            {changedFields.size > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-600">
+                  <strong>Changed fields:</strong> {Array.from(changedFields).join(', ')}
+                </p>
+              </div>
+            )}
 
             {/* Error Message */}
             {error && (
@@ -166,7 +274,6 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                     value={formData.firstName || ''}
                     onChange={(e) => handleInputChange('firstName', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    required
                   />
                 </div>
                 
@@ -177,30 +284,32 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                     value={formData.lastName || ''}
                     onChange={(e) => handleInputChange('lastName', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Student ID (Optional)</label>
                   <input
                     type="text"
                     value={formData.studentId || ''}
                     onChange={(e) => handleInputChange('studentId', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Enter student ID (optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-black"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Optional)</label>
                   <input
                     type="tel"
                     value={formData.phone || ''}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Enter phone number (optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-black"
                   />
+                  <p className="mt-1 text-xs text-gray-700">Leave empty to remove phone number</p>
                 </div>
               </div>
 
@@ -211,9 +320,8 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                     value={formData.role || ''}
                     onChange={(e) => handleInputChange('role', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    required
                   >
-                    <option value="">Select Role</option>
+                    <option value="" className="text-black">Select Role</option>
                     {roles.map((role) => (
                       <option key={role} value={role}>
                         {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
@@ -229,7 +337,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                     onChange={(e) => handleInputChange('department', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
-                    <option value="">Select Department</option>
+                    <option value="" className="text-black">Select Department</option>
                     {departments.map((dept) => (
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
@@ -244,7 +352,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                   onChange={(e) => handleInputChange('yearOfStudy', e.target.value ? parseInt(e.target.value) : undefined)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
-                  <option value="">Select Year</option>
+                  <option value="" className="text-black">Select Year</option>
                   {[1, 2, 3, 4, 5].map((year) => (
                     <option key={year} value={year}>Year {year}</option>
                   ))}
@@ -257,7 +365,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                   value={formData.bio || ''}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
                   placeholder="Enter user bio..."
                 />
               </div>
@@ -271,7 +379,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                     const skills = e.target.value.split(',').map(s => s.trim()).filter(s => s);
                     handleInputChange('skills', skills);
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
                   placeholder="e.g., Python, Arduino, ROS"
                 />
               </div>
@@ -354,7 +462,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                   disabled={isLoading}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
-                  {isLoading ? 'Saving...' : 'Save Changes'}
+                  {isLoading ? 'Saving...' : `Save Changes${changedFields.size > 0 ? ` (${changedFields.size} field${changedFields.size > 1 ? 's' : ''})` : ''}`}
                 </button>
               </div>
             </form>
