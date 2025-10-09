@@ -31,6 +31,15 @@ interface Event {
   category?: string; // Make category optional
   type: string;
   isFeatured: boolean;
+  imageUrl?: string;
+  requiresRegistration: boolean;
+  registrationDeadline?: string;
+  registrationFormLink?: string;
+  featureOptions?: {
+    showInNav: boolean;
+    navLabel?: string;
+    navOrder: number;
+  };
   registrations: any[];
   createdAt: string;
   updatedAt: string;
@@ -42,10 +51,20 @@ interface EventFormData {
   startDate: string;
   endDate: string;
   location: string;
-  maxParticipants: number;
+  maxCapacity: number;
   organizerId: string;
   category: string;
-  tags: string[];
+  type: string;
+  isFeatured: boolean;
+  imageUrl?: string;
+  requiresRegistration: boolean;
+  registrationDeadline?: string;
+  registrationFormLink?: string;
+  featureOptions?: {
+    showInNav: boolean;
+    navLabel?: string;
+    navOrder: number;
+  };
 }
 
 export default function EventsPage() {
@@ -339,16 +358,39 @@ export default function EventsPage() {
                     <tr key={event._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                              <CalendarIcon className="h-6 w-6 text-indigo-600" />
-                            </div>
+                          <div className="flex-shrink-0 h-12 w-12">
+                            {event.imageUrl ? (
+                              <img
+                                src={event.imageUrl}
+                                alt={event.title}
+                                className="h-12 w-12 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                <CalendarIcon className="h-6 w-6 text-indigo-600" />
+                              </div>
+                            )}
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-black">{event.title}</div>
                             <div className="text-sm text-black">{event.description.substring(0, 100)}...</div>
-                            <div className="mt-1">
+                            <div className="mt-1 flex items-center space-x-2">
                               {getCategoryBadge(event.category)}
+                              {event.isFeatured && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  ⭐ Featured
+                                </span>
+                              )}
+                              {event.featureOptions?.showInNav && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  🧭 Nav: {event.featureOptions.navLabel || 'Menu'}
+                                </span>
+                              )}
+                              {event.requiresRegistration && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  Registration Required
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

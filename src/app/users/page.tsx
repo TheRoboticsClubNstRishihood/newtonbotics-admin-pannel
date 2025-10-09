@@ -119,7 +119,7 @@ export default function Users() {
       if (selectedRole) params.append('role', selectedRole);
       if (selectedDepartment) params.append('department', selectedDepartment);
 
-      const response = await fetch(`http://localhost:3005/api/users?${params}`, {
+      const response = await fetch(`/api/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -145,7 +145,7 @@ export default function Users() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3005/api/users/statistics', {
+      const response = await fetch(`/api/users/statistics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -168,7 +168,7 @@ export default function Users() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3005/api/users/departments', {
+      const response = await fetch(`/api/users/departments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -189,7 +189,7 @@ export default function Users() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3005/api/users/roles', {
+      const response = await fetch(`/api/users/roles`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -212,7 +212,7 @@ export default function Users() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`http://localhost:3005/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -238,7 +238,7 @@ export default function Users() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`http://localhost:3005/api/users/${userId}/reactivate`, {
+      const response = await fetch(`/api/users/${userId}/reactivate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -26,6 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../components/AdminLayout';
 import EditUserModal from '../../../components/EditUserModal';
+import { ErrorBoundary } from '../../../components/ErrorBoundary';
 
 interface User {
   id: string;
@@ -71,6 +72,11 @@ export default function UserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Debug modal state changes
+  useEffect(() => {
+    console.log('Modal state changed:', isEditModalOpen);
+  }, [isEditModalOpen]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -92,7 +98,7 @@ export default function UserDetailPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:3005/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -118,7 +124,7 @@ export default function UserDetailPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3005/api/users/departments', {
+      const response = await fetch(`/api/users/departments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -139,7 +145,7 @@ export default function UserDetailPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3005/api/users/roles', {
+      const response = await fetch(`/api/users/roles`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -163,7 +169,7 @@ export default function UserDetailPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`http://localhost:3005/api/users/${user.id}`, {
+      const response = await fetch(`/api/users/${user.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -193,7 +199,7 @@ export default function UserDetailPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`http://localhost:3005/api/users/${user.id}/reactivate`, {
+      const response = await fetch(`/api/users/${user.id}/reactivate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -216,7 +222,11 @@ export default function UserDetailPage() {
   };
 
   const handleSaveUser = (updatedUser: User) => {
+    console.log('Saving user:', updatedUser);
     setUser(updatedUser);
+    setIsEditModalOpen(false);
+    // Optionally show a success message
+    // You can add a toast notification here if needed
   };
 
   const formatDate = (dateString: string) => {
@@ -261,6 +271,7 @@ export default function UserDetailPage() {
   }
 
   return (
+    <>
     <AdminLayout pageTitle={`${user.firstName} ${user.lastName} - User Details`}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
@@ -285,7 +296,10 @@ export default function UserDetailPage() {
             
             <div className="flex space-x-3">
               <button
-                onClick={() => setIsEditModalOpen(true)}
+                onClick={() => {
+                  console.log('Edit button clicked, opening modal for user:', user);
+                  setIsEditModalOpen(true);
+                }}
                 className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
                 <PencilIcon className="w-4 h-4" />
@@ -542,15 +556,36 @@ export default function UserDetailPage() {
         </div>
       </div>
 
-      {/* Edit User Modal */}
-      <EditUserModal
-        user={user}
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSaveUser}
-        departments={departments}
-        roles={roles}
-      />
     </AdminLayout>
+
+    {/* Edit User Modal - Rendered outside AdminLayout */}
+    {isEditModalOpen && user && (
+      <ErrorBoundary
+        fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-500 bg-opacity-75">
+            <div className="bg-white p-6 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Modal Error</h3>
+              <p className="text-gray-600 mb-4">There was an error loading the edit modal.</p>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <EditUserModal
+          user={user}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={handleSaveUser}
+          departments={departments}
+          roles={roles}
+        />
+      </ErrorBoundary>
+    )}
+    </>
   );
 }

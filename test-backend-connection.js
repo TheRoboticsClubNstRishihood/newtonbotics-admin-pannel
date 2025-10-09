@@ -14,7 +14,7 @@ async function testBackendConnection() {
     
     try {
       // Test GET events
-      const getResponse = await fetch(`http://localhost:${port}/api/events`, {
+      const getResponse = await fetch(`${process.env.DEV_BACKEND_URL || `http://localhost:${port}`}/api/events`, {
         headers: {
           'Authorization': `Bearer ${testToken}`,
           'Content-Type': 'application/json'
@@ -31,7 +31,7 @@ async function testBackendConnection() {
           const firstEventId = data.data.items[0]._id;
           console.log(`🗑️  Testing DELETE /api/events/${firstEventId}...`);
           
-          const deleteResponse = await fetch(`http://localhost:${port}/api/events/${firstEventId}`, {
+          const deleteResponse = await fetch(`${process.env.DEV_BACKEND_URL || `http://localhost:${port}`}/api/events/${firstEventId}`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${testToken}`,

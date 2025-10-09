@@ -19,6 +19,37 @@
   }
 }
 
+/* Improve placeholder text contrast - make it black */
+::placeholder {
+  color: #000000 !important; /* black */
+  opacity: 1;
+}
+
+/* Ensure select option text is visible - make it black */
+option {
+  color: #000000 !important; /* black */
+}
+
+/* Force all placeholder text to be black */
+input::placeholder,
+textarea::placeholder {
+  color: #000000 !important;
+  opacity: 1 !important;
+}
+
+/* Force all select options to be black */
+select option {
+  color: #000000 !important;
+}
+
+/* Specific styles for EditUserModal */
+.fixed.inset-0 input::placeholder,
+.fixed.inset-0 textarea::placeholder,
+.fixed.inset-0 select option {
+  color: #000000 !important;
+  opacity: 1 !important;
+}
+
 
 
 body {

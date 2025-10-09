@@ -17,7 +17,7 @@ export async function POST(
     const authHeader = request.headers.get('authorization');
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
+    const backendUrl = 'http://localhost:3005';
     const resolvedParams = await params;
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - News ID:', resolvedParams.id);

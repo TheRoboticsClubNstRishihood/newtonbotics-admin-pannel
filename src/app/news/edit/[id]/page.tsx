@@ -23,6 +23,18 @@ interface NewsCategory {
   createdAt: string;
 }
 
+interface Event {
+  _id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  category: string;
+  type: string;
+  status: string;
+}
+
 interface NewsArticle {
   _id: string;
   id?: string; // For compatibility
@@ -98,6 +110,7 @@ export default function EditNews() {
   const params = useParams();
   const { showSuccess, showError } = useToast();
   const [categories, setCategories] = useState<NewsCategory[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [article, setArticle] = useState<NewsArticle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -146,8 +159,9 @@ export default function EditNews() {
       return;
     }
     
-    console.log('User authenticated, fetching article and categories');
+    console.log('User authenticated, fetching article, categories, and events');
     fetchArticleAndCategories();
+    fetchEvents();
   }, [articleId]);
 
   const fetchArticleAndCategories = async () => {
@@ -236,6 +250,63 @@ export default function EditNews() {
     }
   };
 
+  const fetchEvents = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        window.location.href = '/';
+        return;
+      }
+
+      const response = await fetch('/api/events', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Events loaded:', data.data.items?.length || 0, 'events');
+        setEvents(data.data.items || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch events:', errorData);
+        
+        // Show mock data for testing
+        const mockEvents = [
+          {
+            _id: '68b2df886abc19933b13d029',
+            title: 'Robotics Workshop: Introduction to Arduino',
+            description: 'Learn the basics of Arduino programming and robotics in this hands-on workshop.',
+            startDate: '2024-01-15T10:00:00.000Z',
+            endDate: '2024-01-15T16:00:00.000Z',
+            location: 'Engineering Building - Room 101',
+            category: 'workshop',
+            type: 'workshop',
+            status: 'upcoming'
+          },
+          {
+            _id: '68b2df886abc19933b13d030',
+            title: 'AI Competition 2024',
+            description: 'Annual AI competition showcasing innovative projects from students.',
+            startDate: '2024-02-20T09:00:00.000Z',
+            endDate: '2024-02-20T18:00:00.000Z',
+            location: 'Main Auditorium',
+            category: 'competition',
+            type: 'competition',
+            status: 'upcoming'
+          }
+        ];
+        setEvents(mockEvents);
+        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      showError('Network error while fetching events');
+    }
+  };
+
   const validateFormData = (data: any) => {
     const errors: string[] = [];
     
@@ -265,6 +336,15 @@ export default function EditNews() {
     if (!formData.title.trim() || !formData.content.trim() || !formData.categoryId) {
       showError('Please fill in all required fields');
       return;
+    }
+
+    // Validate ObjectId format if targetId is provided
+    if (formData.application.targetId && formData.application.targetId.trim()) {
+      const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+      if (!objectIdRegex.test(formData.application.targetId.trim())) {
+        showError('Target ID must be a valid ObjectId (24-character hex string)');
+        return;
+      }
     }
 
     // Additional validation
@@ -780,20 +860,25 @@ export default function EditNews() {
                     {/* Application Target ID */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Target ID (e.g., workshop ID, event ID)
+                        Target Event/Workshop (Optional)
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={formData.application.targetId || ''}
                         onChange={(e) => setFormData(prev => ({ 
                           ...prev, 
                           application: { ...prev.application, targetId: e.target.value }
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
-                        placeholder="Enter target ID"
-                      />
+                      >
+                        <option value="">Select an event or workshop...</option>
+                        {events.map((event) => (
+                          <option key={event._id} value={event._id}>
+                            {event.title} ({event.type}) - {new Date(event.startDate).toLocaleDateString()}
+                          </option>
+                        ))}
+                      </select>
                       <p className="mt-1 text-sm text-gray-500">
-                        Link to a specific workshop, event, or competition
+                        Link to a specific workshop, event, or competition. Only valid ObjectIds are accepted.
                       </p>
                     </div>
 

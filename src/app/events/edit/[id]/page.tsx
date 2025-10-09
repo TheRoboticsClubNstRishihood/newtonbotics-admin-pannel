@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../../components/AdminLayout';
 import { useToast } from '../../../../components/ToastContext';
+import CloudinaryUploader from '../../../../components/CloudinaryUploader';
 
 interface Event {
   _id: string;
@@ -21,6 +22,15 @@ interface Event {
   category: string;
   type: string;
   isFeatured: boolean;
+  imageUrl?: string;
+  requiresRegistration: boolean;
+  registrationDeadline?: string;
+  registrationFormLink?: string;
+  featureOptions?: {
+    showInNav: boolean;
+    navLabel?: string;
+    navOrder: number;
+  };
   registrations: any[];
   createdAt: string;
   updatedAt: string;
@@ -37,6 +47,15 @@ interface EventFormData {
   category: string;
   type: string;
   isFeatured: boolean;
+  imageUrl?: string;
+  requiresRegistration: boolean;
+  registrationDeadline?: string;
+  registrationFormLink?: string;
+  featureOptions?: {
+    showInNav: boolean;
+    navLabel?: string;
+    navOrder: number;
+  };
 }
 
 export default function EditEventPage() {
@@ -56,7 +75,16 @@ export default function EditEventPage() {
     organizerId: '',
     category: '',
     type: '',
-    isFeatured: false
+    isFeatured: false,
+    imageUrl: '',
+    requiresRegistration: false,
+    registrationDeadline: '',
+    registrationFormLink: '',
+    featureOptions: {
+      showInNav: false,
+      navLabel: '',
+      navOrder: 0
+    }
   });
 
   useEffect(() => {
@@ -115,7 +143,16 @@ export default function EditEventPage() {
           organizerId: eventData.organizerId,
           category: eventData.category,
           type: eventData.type,
-          isFeatured: eventData.isFeatured
+          isFeatured: eventData.isFeatured,
+          imageUrl: eventData.imageUrl || '',
+          requiresRegistration: eventData.requiresRegistration || false,
+          registrationDeadline: eventData.registrationDeadline ? eventData.registrationDeadline.split('T')[0] + 'T' + eventData.registrationDeadline.split('T')[1].substring(0, 5) : '',
+          registrationFormLink: eventData.registrationFormLink || '',
+          featureOptions: eventData.featureOptions || {
+            showInNav: false,
+            navLabel: '',
+            navOrder: 0
+          }
         });
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -135,14 +172,93 @@ export default function EditEventPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title.trim() || !formData.description.trim() || !formData.startDate || !formData.endDate || !formData.location || formData.maxCapacity <= 0) {
-      showError('Please fill in all required fields');
+    // Frontend validation with specific error messages
+    if (!formData.title.trim()) {
+      showError('Title is required');
       return;
     }
-
+    
+    if (formData.title.trim().length < 2) {
+      showError('Title must be at least 2 characters long');
+      return;
+    }
+    
+    if (formData.title.trim().length > 255) {
+      showError('Title must be less than 255 characters');
+      return;
+    }
+    
+    if (!formData.description.trim()) {
+      showError('Description is required');
+      return;
+    }
+    
+    if (formData.description.trim().length < 10) {
+      showError('Description must be at least 10 characters long');
+      return;
+    }
+    
+    if (formData.description.trim().length > 5000) {
+      showError('Description must be less than 5000 characters');
+      return;
+    }
+    
+    if (!formData.startDate) {
+      showError('Start date is required');
+      return;
+    }
+    
+    if (!formData.endDate) {
+      showError('End date is required');
+      return;
+    }
+    
     if (new Date(formData.startDate) >= new Date(formData.endDate)) {
       showError('End date must be after start date');
       return;
+    }
+    
+    if (!formData.location.trim()) {
+      showError('Location is required');
+      return;
+    }
+    
+    if (formData.maxCapacity <= 0) {
+      showError('Maximum capacity must be greater than 0');
+      return;
+    }
+    
+    if (!formData.type) {
+      showError('Event type is required');
+      return;
+    }
+    
+    // Validate featured options if enabled
+    if (formData.featureOptions?.showInNav) {
+      if (!formData.featureOptions.navLabel || formData.featureOptions.navLabel.trim().length < 2) {
+        showError('Navigation label must be at least 2 characters when "Show in Navigation Menu" is enabled');
+        return;
+      }
+      
+      if (formData.featureOptions.navLabel && formData.featureOptions.navLabel.length > 50) {
+        showError('Navigation label must be less than 50 characters');
+        return;
+      }
+      
+      if (formData.featureOptions.navOrder < 0) {
+        showError('Navigation order must be 0 or greater');
+        return;
+      }
+    }
+    
+    // Validate registration form link if provided
+    if (formData.requiresRegistration && formData.registrationFormLink) {
+      try {
+        new URL(formData.registrationFormLink);
+      } catch {
+        showError('Registration form link must be a valid URL');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -183,7 +299,34 @@ export default function EditEventPage() {
         router.push('/events');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        showError(`Failed to update event: ${errorData.message || 'Unknown error'}`);
+        console.error('Error response:', errorData);
+        
+        // Handle different types of error responses
+        let errorMessage = 'Failed to update event';
+        
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        } else if (errorData.error?.details?.errors && Array.isArray(errorData.error.details.errors)) {
+          // Handle validation errors array
+          const validationErrors = errorData.error.details.errors.map((err: any) => err.message).join(', ');
+          errorMessage = validationErrors;
+        } else if (errorData.error?.details?.message) {
+          errorMessage = errorData.error.details.message;
+        } else if (response.status === 400) {
+          errorMessage = 'Invalid data provided. Please check all fields and try again.';
+        } else if (response.status === 401) {
+          errorMessage = 'Authentication failed. Please log in again.';
+        } else if (response.status === 403) {
+          errorMessage = 'You do not have permission to update events.';
+        } else if (response.status === 404) {
+          errorMessage = 'Event not found.';
+        } else if (response.status >= 500) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+        
+        showError(errorMessage);
       }
     } catch (error) {
       console.error('Error updating event:', error);
@@ -249,8 +392,15 @@ export default function EditEventPage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
                     placeholder="Enter event title"
+                    minLength={2}
+                    maxLength={255}
                     required
                   />
+                  <div className="mt-1 text-xs text-gray-500 text-right">
+                    <span className={formData.title.length > 255 ? 'text-red-500' : ''}>
+                      {formData.title.length}/255
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-black mb-2">
@@ -301,8 +451,16 @@ export default function EditEventPage() {
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
                   placeholder="Describe the event, its objectives, and what participants can expect..."
+                  minLength={10}
+                  maxLength={5000}
                   required
                 />
+                <div className="mt-1 flex justify-between text-xs text-gray-500">
+                  <span>Minimum 10 characters required</span>
+                  <span className={formData.description.length > 5000 ? 'text-red-500' : ''}>
+                    {formData.description.length}/5000
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -376,7 +534,178 @@ export default function EditEventPage() {
               </div>
             </div>
 
+            {/* Event Image */}
+            <div>
+              <h3 className="text-lg font-medium text-black mb-4">Event Image</h3>
+              <div className="space-y-4">
+                {formData.imageUrl && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-black mb-2">Current Image:</p>
+                    <img
+                      src={formData.imageUrl}
+                      alt="Current event image"
+                      className="w-64 h-40 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800"
+                    >
+                      Remove Current Image
+                    </button>
+                  </div>
+                )}
+                <CloudinaryUploader
+                  label={formData.imageUrl ? "Replace Event Image" : "Upload Event Image"}
+                  folder="newtonbotics/events"
+                  onUploadComplete={(result) => {
+                    setFormData(prev => ({ ...prev, imageUrl: result.secureUrl }));
+                  }}
+                  showPreview={true}
+                  previewWidth={300}
+                  previewHeight={200}
+                  maxFileSizeBytes={5 * 1024 * 1024} // 5MB limit
+                />
+              </div>
+            </div>
 
+            {/* Registration Settings */}
+            <div>
+              <h3 className="text-lg font-medium text-black mb-4">Registration Settings</h3>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="requiresRegistration"
+                    checked={formData.requiresRegistration}
+                    onChange={(e) => setFormData(prev => ({ ...prev, requiresRegistration: e.target.checked }))}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="requiresRegistration" className="ml-2 block text-sm text-black">
+                    This event requires registration
+                  </label>
+                </div>
+
+                {formData.requiresRegistration && (
+                  <div className="space-y-4 pl-6 border-l-2 border-indigo-200">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Registration Deadline
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={formData.registrationDeadline}
+                        onChange={(e) => setFormData(prev => ({ ...prev, registrationDeadline: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Registration Form Link
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.registrationFormLink}
+                        onChange={(e) => setFormData(prev => ({ ...prev, registrationFormLink: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                        placeholder="https://forms.google.com/..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Link to external registration form (Google Forms, etc.)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Featured Options */}
+            <div>
+              <h3 className="text-lg font-medium text-black mb-4">Featured Options</h3>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="isFeatured"
+                    checked={formData.isFeatured}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isFeatured: e.target.checked }))}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isFeatured" className="ml-2 block text-sm text-black">
+                    Mark as Featured Event
+                  </label>
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="showInNav"
+                    checked={formData.featureOptions?.showInNav || false}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      featureOptions: { 
+                        ...prev.featureOptions, 
+                        showInNav: e.target.checked,
+                        navOrder: e.target.checked ? (prev.featureOptions?.navOrder || 0) : 0
+                      } 
+                    }))}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="showInNav" className="ml-2 block text-sm text-black">
+                    Show in Navigation Menu
+                  </label>
+                </div>
+
+                {formData.featureOptions?.showInNav && (
+                  <div className="space-y-4 pl-6 border-l-2 border-indigo-200">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Navigation Label
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.featureOptions?.navLabel || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          featureOptions: { 
+                            ...prev.featureOptions, 
+                            navLabel: e.target.value 
+                          } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                        placeholder="e.g., Workshops, Competitions"
+                        maxLength={50}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Label to display in navigation menu (max 50 characters)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Navigation Order
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.featureOptions?.navOrder || 0}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          featureOptions: { 
+                            ...prev.featureOptions, 
+                            navOrder: parseInt(e.target.value) || 0 
+                          } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                        placeholder="0"
+                        min="0"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Order in navigation menu (lower numbers appear first)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Submit Buttons */}
             <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">

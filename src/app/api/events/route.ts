@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
+const backendUrl = 'http://localhost:3005';
 console.log('Environment BACKEND_URL:', process.env.BACKEND_URL);
 console.log('Using backend URL:', backendUrl);
 

@@ -70,7 +70,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch('http://localhost:3005/api/auth/me', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-servers-chi.vercel.app'}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -201,7 +201,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3005/api/auth/login', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-servers-chi.vercel.app'}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

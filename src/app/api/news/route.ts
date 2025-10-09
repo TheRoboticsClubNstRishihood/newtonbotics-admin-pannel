@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (search) queryParams.append('search', search);
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
+    const backendUrl = 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/news?${queryParams}`, {
       headers: {
         'Authorization': authHeader,
