@@ -160,25 +160,46 @@ export default function MediaPage() {
       const data = await res.json();
       console.log('Categories response data:', data);
       
-      const rawRoot: any = (data && data.data) ?? data;
-      let list: any[] = [];
-      if (Array.isArray(rawRoot)) list = rawRoot;
-      else if (Array.isArray(rawRoot.categories)) list = rawRoot.categories;
-      else if (Array.isArray(rawRoot?.data?.categories)) list = rawRoot.data.categories;
-      else if (Array.isArray(rawRoot.items)) list = rawRoot.items;
-      else if (Array.isArray(rawRoot?.categories?.items)) list = rawRoot.categories.items;
-      else if (Array.isArray(rawRoot?.data?.items)) list = rawRoot.data.items;
+      const rawRoot = (data && data.data) ?? data;
+      let list: Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }> = [];
+      
+      // Helper function to safely get nested array
+      const getNestedArray = (obj: unknown, path: string[]): unknown[] | null => {
+        let current = obj;
+        for (const key of path) {
+          if (current && typeof current === 'object' && key in current) {
+            current = (current as Record<string, unknown>)[key];
+          } else {
+            return null;
+          }
+        }
+        return Array.isArray(current) ? current : null;
+      };
+
+      if (Array.isArray(rawRoot)) {
+        list = rawRoot;
+      } else if (Array.isArray(rawRoot?.categories)) {
+        list = rawRoot.categories;
+      } else if (getNestedArray(rawRoot, ['data', 'categories'])) {
+        list = getNestedArray(rawRoot, ['data', 'categories']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
+      } else if (Array.isArray(rawRoot?.items)) {
+        list = rawRoot.items;
+      } else if (getNestedArray(rawRoot, ['categories', 'items'])) {
+        list = getNestedArray(rawRoot, ['categories', 'items']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
+      } else if (getNestedArray(rawRoot, ['data', 'items'])) {
+        list = getNestedArray(rawRoot, ['data', 'items']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
+      }
 
       console.log('Extracted categories list:', list);
 
       // Normalize minimal shape {_id, name}
-      list = (list || []).map((c: any) => ({
-        _id: c?._id || c?.id,
+      const normalizedList: CategoryItem[] = (list || []).map((c: { _id?: string; id?: string; name?: string; title?: string; label?: string }) => ({
+        _id: c?._id || c?.id || '',
         name: c?.name || c?.title || c?.label || 'Unnamed'
-      })).filter((c: any) => c._id && c.name);
+      })).filter((c: { _id: string; name: string }) => c._id && c.name);
 
-      console.log('Normalized categories:', list);
-      setCategories(list);
+      console.log('Normalized categories:', normalizedList);
+      setCategories(normalizedList);
     } catch (e) {
       console.error('Failed to fetch categories', e);
     }
@@ -305,7 +326,7 @@ export default function MediaPage() {
         window.location.href = '/';
         return;
       }
-      const payload: any = {
+      const payload: { title: string; fileUrl: string; fileType: string; uploadedBy: string; description?: string; categoryId?: string; thumbnailUrl?: string; fileSize?: number; dimensions?: string; tags?: string[]; isFeatured?: boolean } = {
         title: form.title,
         fileUrl: form.fileUrl,
         fileType: form.fileType,
@@ -632,7 +653,7 @@ export default function MediaPage() {
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 capitalize">{item.fileType}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {categories.find(c => c._id === (item.categoryId as any))?.name || '-'}
+                      {categories.find(c => c._id === item.categoryId)?.name || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()}
@@ -647,7 +668,7 @@ export default function MediaPage() {
                               title: item.title || '',
                               description: item.description || '',
                               fileType: item.fileType || '',
-                              categoryId: (item.categoryId as any) || '',
+                              categoryId: item.categoryId || '',
                               thumbnailUrl: item.thumbnailUrl || '',
                               tags: Array.isArray(item.tags) ? item.tags.join(', ') : '',
                               isFeatured: item.isFeatured || false,
@@ -890,7 +911,7 @@ export default function MediaPage() {
                   try {
                     const token = localStorage.getItem('accessToken');
                     if (!token) { window.location.href = '/'; return; }
-                    const payload: any = { name: categoryForm.name };
+                    const payload: { name: string; description?: string; parentCategoryId?: string } = { name: categoryForm.name };
                     if (categoryForm.description) payload.description = categoryForm.description;
                     if (categoryForm.parentCategoryId) payload.parentCategoryId = categoryForm.parentCategoryId;
                     const res = await fetch('/api/media/categories', {
@@ -979,7 +1000,7 @@ export default function MediaPage() {
                   try {
                     const token = localStorage.getItem('accessToken');
                     if (!token) { window.location.href = '/'; return; }
-                    const payload: any = {
+                    const payload: { title: string; description?: string; fileType?: string; categoryId?: string; thumbnailUrl?: string; tags?: string[]; isFeatured: boolean; fileUrl?: string } = {
                       title: editForm.title,
                       description: editForm.description || undefined,
                       fileType: editForm.fileType || undefined,
@@ -1166,7 +1187,7 @@ export default function MediaPage() {
                 <div className="p-6">
                   <div className="mb-4">
                     <p className="text-sm text-gray-600 mb-2">
-                      Are you sure you want to delete <strong>"{itemToDelete.title}"</strong>?
+                      Are you sure you want to delete <strong>&quot;{itemToDelete.title}&quot;</strong>?
                     </p>
                     <p className="text-xs text-gray-500">
                       This action cannot be undone.

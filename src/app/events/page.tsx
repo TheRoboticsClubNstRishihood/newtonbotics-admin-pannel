@@ -10,8 +10,7 @@ import {
   ExclamationTriangleIcon,
   CalendarIcon,
   MapPinIcon,
-  UserGroupIcon,
-  ClockIcon
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
 import { useToast } from '../../components/ToastContext';
@@ -40,32 +39,18 @@ interface Event {
     navLabel?: string;
     navOrder: number;
   };
-  registrations: any[];
+  registrations: Array<{
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    registeredAt: string;
+    status: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
 
-interface EventFormData {
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  location: string;
-  maxCapacity: number;
-  organizerId: string;
-  category: string;
-  type: string;
-  isFeatured: boolean;
-  imageUrl?: string;
-  requiresRegistration: boolean;
-  registrationDeadline?: string;
-  registrationFormLink?: string;
-  featureOptions?: {
-    showInNav: boolean;
-    navLabel?: string;
-    navOrder: number;
-  };
-}
 
 export default function EventsPage() {
   const router = useRouter();
@@ -471,7 +456,7 @@ export default function EventsPage() {
               <h3 className="text-lg font-medium text-black mt-4">Delete Event</h3>
               <div className="mt-2 px-7 py-3">
                 <p className="text-sm text-black">
-                  Are you sure you want to delete "{selectedEvent.title}"? This action cannot be undone.
+                  Are you sure you want to delete &quot;{selectedEvent.title}&quot;? This action cannot be undone.
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
                   Event ID: {getEventId(selectedEvent)}

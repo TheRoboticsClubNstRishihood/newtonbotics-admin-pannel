@@ -5,7 +5,7 @@ const backendUrl = getBackendUrl();
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
     const token = request.headers.get('authorization');
@@ -13,7 +13,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const { id, memberId } = params;
+    const { id, memberId } = await params;
     const url = `${backendUrl}/api/projects/${id}/members/${memberId}`;
 
     console.log('Removing team member:', url);

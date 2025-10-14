@@ -31,8 +31,19 @@ interface Equipment {
   totalQuantity: number;
   status: 'available' | 'low_stock' | 'out_of_stock' | 'maintenance';
   description: string;
-  specifications: Record<string, any>;
+  modelNumber?: string;
+  serialNumber?: string;
+  manufacturer?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  minQuantity?: number;
+  maxQuantity?: number;
+  specifications: Record<string, string | number | boolean>;
   location: string;
+  imageUrl?: string;
+  maintenanceSchedule?: string;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
   lastMaintenance?: string;
   nextMaintenance?: string;
   createdAt: string;
@@ -50,10 +61,10 @@ interface EquipmentFormData {
   purchasePrice?: number;
   currentQuantity: number;
   minQuantity: number;
-  maxQuantity: number;
+  maxQuantity?: number;
   location: string;
   imageUrl?: string;
-  specifications: Record<string, any>;
+  specifications: Record<string, string | number | boolean>;
   maintenanceSchedule?: string;
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
@@ -68,7 +79,6 @@ export default function EditEquipment() {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUsingMockData, setIsUsingMockData] = useState(false);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
   const [formData, setFormData] = useState<EquipmentFormData>({
@@ -96,7 +106,7 @@ export default function EditEquipment() {
   ]);
 
   // Helper function to get category ID safely
-  const getCategoryId = (categoryData: any): string => {
+  const getCategoryId = (categoryData: string | { id?: string; _id?: string }): string => {
     if (typeof categoryData === 'string') return categoryData;
     if (categoryData && categoryData.id) return categoryData.id;
     if (categoryData && categoryData._id) return categoryData._id;
@@ -164,7 +174,7 @@ export default function EditEquipment() {
       if (response.ok) {
         const data = await response.json();
         // Convert _id to id for consistency
-        const processedCategories = (data.data.items || []).map((cat: any) => ({
+        const processedCategories = (data.data.items || []).map((cat: { _id?: string; id?: string; name: string; description?: string }) => ({
           ...cat,
           id: cat._id || cat.id
         }));
@@ -296,73 +306,9 @@ export default function EditEquipment() {
         
                 setSpecificationFields(specFields);
       } else {
-        // Show mock data for testing
-        const mockEquipment = {
-          id: equipmentId,
-          name: 'Arduino Uno R3',
-          categoryId: {
-            id: '68a3221d8519f6402ffd1be3',
-            name: 'Arduino Boards',
-            description: 'Arduino Uno, Nano, Mega, and compatible boards'
-          },
-          description: 'Arduino Uno R3 microcontroller board with USB cable',
-          modelNumber: 'UNO-R3',
-          serialNumber: 'ARD123456789',
-          manufacturer: 'Arduino AG',
-          purchaseDate: '2023-01-01T00:00:00.000Z',
-          purchasePrice: 25.99,
-          currentQuantity: 15,
-          minQuantity: 5,
-          maxQuantity: 20,
-          location: 'Lab A - Shelf 3',
-          status: 'available',
-          imageUrl: 'https://example.com/arduino-uno.jpg',
-          specifications: {
-            microcontroller: 'ATmega328P',
-            operatingVoltage: '5V',
-            inputVoltage: '7-12V',
-            digitalPins: 14,
-            analogPins: 6
-          },
-          maintenanceSchedule: 'Every 6 months',
-          lastMaintenanceDate: '2023-08-15T00:00:00.000Z',
-          nextMaintenanceDate: '2024-02-15T00:00:00.000Z',
-          createdAt: '2023-01-01T00:00:00.000Z',
-          updatedAt: '2023-09-05T10:30:00.000Z'
-        };
-
-        setEquipment(mockEquipment);
-        setIsUsingMockData(true);
-        
-        const specFields = Object.entries(mockEquipment.specifications).map(([key, value]) => ({
-          key,
-          value: Array.isArray(value) ? value.join(', ') : String(value)
-        }));
-        setSpecificationFields(specFields);
-        
-        const mockCategoryId = getCategoryId(mockEquipment.categoryId);
-        console.log('Setting mock categoryId in form:', mockCategoryId);
-        setFormData({
-          name: mockEquipment.name,
-          categoryId: mockCategoryId,
-          description: mockEquipment.description,
-          modelNumber: mockEquipment.modelNumber || '',
-          serialNumber: mockEquipment.serialNumber || '',
-          manufacturer: mockEquipment.manufacturer || '',
-          purchaseDate: mockEquipment.purchaseDate ? mockEquipment.purchaseDate.split('T')[0] : '',
-          purchasePrice: mockEquipment.purchasePrice,
-          currentQuantity: mockEquipment.currentQuantity,
-          minQuantity: mockEquipment.minQuantity || 0,
-          maxQuantity: mockEquipment.maxQuantity,
-          location: mockEquipment.location,
-          imageUrl: mockEquipment.imageUrl || '',
-          specifications: mockEquipment.specifications,
-          maintenanceSchedule: mockEquipment.maintenanceSchedule || '',
-          lastMaintenanceDate: mockEquipment.lastMaintenanceDate ? mockEquipment.lastMaintenanceDate.split('T')[0] : '',
-          nextMaintenanceDate: mockEquipment.nextMaintenanceDate ? mockEquipment.nextMaintenanceDate.split('T')[0] : ''
-        });
-        
-        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+        // Equipment not found
+        showError(`Equipment not found (${response.status}). Please check the equipment ID and try again.`);
+        router.push('/inventory');
       }
     } catch (error) {
       console.error('Error fetching equipment:', error);
@@ -418,61 +364,6 @@ export default function EditEquipment() {
       return;
     }
 
-    // Check if we should handle as mock data
-    const shouldHandleAsMock = isUsingMockData || equipmentId.startsWith('64f8');
-    
-    if (shouldHandleAsMock) {
-      // Handle mock data update
-      
-      // Convert specification fields to object
-      const specifications: Record<string, any> = {};
-      specificationFields.forEach(field => {
-        if (field.key.trim() && field.value.trim()) {
-          // Try to parse as number if possible
-          const numValue = parseFloat(field.value);
-          specifications[field.key.trim()] = isNaN(numValue) ? field.value.trim() : numValue;
-        }
-      });
-
-      // Create updated equipment data
-      const updatedEquipment = {
-        ...equipment,
-        name: formData.name,
-        categoryId: {
-          id: typeof formData.categoryId === 'object' ? formData.categoryId.id : formData.categoryId,
-          name: categories.find(cat => cat.id === (typeof formData.categoryId === 'object' ? formData.categoryId.id : formData.categoryId))?.name || 'Unknown',
-          description: categories.find(cat => cat.id === (typeof formData.categoryId === 'object' ? formData.categoryId.id : formData.categoryId))?.description || ''
-        },
-        description: formData.description,
-        modelNumber: formData.modelNumber,
-        serialNumber: formData.serialNumber,
-        manufacturer: formData.manufacturer,
-        purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate).toISOString() : undefined,
-        purchasePrice: formData.purchasePrice,
-        currentQuantity: formData.currentQuantity,
-        minQuantity: formData.minQuantity,
-        maxQuantity: formData.maxQuantity,
-        location: formData.location,
-        imageUrl: formData.imageUrl,
-        specifications: specifications,
-        maintenanceSchedule: formData.maintenanceSchedule,
-        lastMaintenanceDate: formData.lastMaintenanceDate ? new Date(formData.lastMaintenanceDate).toISOString() : undefined,
-        nextMaintenanceDate: formData.nextMaintenanceDate ? new Date(formData.nextMaintenanceDate).toISOString() : undefined,
-        updatedAt: new Date().toISOString()
-      };
-
-      // Update local state
-      setEquipment(updatedEquipment);
-
-      // Store updated equipment in localStorage for persistence
-      const storedEquipment = JSON.parse(localStorage.getItem('updatedEquipment') || '{}');
-      storedEquipment[equipmentId] = updatedEquipment;
-      localStorage.setItem('updatedEquipment', JSON.stringify(storedEquipment));
-
-      showSuccess('Equipment updated successfully! (Mock data)');
-      router.push('/inventory');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -483,7 +374,7 @@ export default function EditEquipment() {
       }
 
       // Convert specification fields to object
-      const specifications: Record<string, any> = {};
+      const specifications: Record<string, string | number> = {};
       specificationFields.forEach(field => {
         if (field.key.trim() && field.value.trim()) {
           // Try to parse as number if possible
@@ -494,7 +385,7 @@ export default function EditEquipment() {
 
       const requestData = {
         name: formData.name.trim(),
-        categoryId: typeof formData.categoryId === 'object' ? formData.categoryId.id : formData.categoryId,
+        categoryId: formData.categoryId,
         description: formData.description.trim(),
         modelNumber: formData.modelNumber?.trim() || undefined,
         serialNumber: formData.serialNumber?.trim() || undefined,
@@ -605,7 +496,7 @@ export default function EditEquipment() {
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="text-center">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Equipment not found</h3>
-            <p className="text-gray-600 mb-4">The equipment you're looking for doesn't exist.</p>
+            <p className="text-gray-600 mb-4">The equipment you&apos;re looking for doesn&apos;t exist.</p>
             <button
               onClick={() => router.push('/inventory')}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"

@@ -19,9 +19,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 // Helper function to verify JWT token
 function verifyToken(token: string) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; exp: number };
     return { valid: true, payload: decoded };
-  } catch (error) {
+  } catch {
     return { valid: false, payload: null };
   }
 }
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user exists and is active
-    if (payload.email !== ADMIN_USER.email || !ADMIN_USER.isActive) {
+    if (!payload || payload.email !== ADMIN_USER.email || !ADMIN_USER.isActive) {
       return NextResponse.json(
         {
           success: false,

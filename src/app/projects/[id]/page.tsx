@@ -20,10 +20,7 @@ import {
   DocumentTextIcon,
   TrophyIcon,
   HashtagIcon,
-  PlusIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon
+  PlusIcon
 } from '@heroicons/react/24/outline';
 
 interface Project {
@@ -91,6 +88,7 @@ interface Project {
       lastName: string;
     };
     completedAt?: string;
+    createdAt?: string;
   }>;
   imageUrl?: string;
   videoUrl?: string;
@@ -227,11 +225,22 @@ export default function ProjectDetailsPage() {
     });
   };
 
-  const handleMemberAdded = (member: any) => {
+  const handleMemberAdded = (member: { userId: string; role: string; skills?: string[]; responsibilities?: string[]; timeCommitment?: { hoursPerWeek: number } }) => {
     if (project) {
+      // Convert member format to match teamMembers interface
+      const convertedMember = {
+        id: member.userId,
+        firstName: 'New', // Default values since TeamMemberModal doesn't provide name
+        lastName: 'Member',
+        role: member.role,
+        skills: member.skills || [],
+        responsibilities: member.responsibilities || [],
+        timeCommitment: member.timeCommitment
+      };
+      
       setProject({
         ...project,
-        teamMembers: [...(project.teamMembers || []), member]
+        teamMembers: [...(project.teamMembers || []), convertedMember]
       });
     }
   };
@@ -245,21 +254,45 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const handleMilestoneAdded = (milestone: any) => {
+  const handleMilestoneAdded = (milestone: { id: string; title: string; description?: string; dueDate: string; status: 'pending' | 'in_progress' | 'completed' | 'overdue'; assignedTo?: { id: string; firstName: string; lastName: string }; completedAt?: string; createdAt: string }) => {
     if (project) {
+      // Convert milestone format to match milestones interface
+      const convertedMilestone = {
+        id: milestone.id,
+        title: milestone.title,
+        description: milestone.description,
+        dueDate: milestone.dueDate,
+        status: milestone.status,
+        assignedTo: milestone.assignedTo,
+        completedAt: milestone.completedAt,
+        createdAt: milestone.createdAt
+      };
+      
       setProject({
         ...project,
-        milestones: [...(project.milestones || []), milestone]
+        milestones: [...(project.milestones || []), convertedMilestone]
       });
     }
   };
 
-  const handleMilestoneUpdated = (updatedMilestone: any) => {
+  const handleMilestoneUpdated = (updatedMilestone: { id: string; title: string; description?: string; dueDate: string; status: 'pending' | 'in_progress' | 'completed' | 'overdue'; assignedTo?: { id: string; firstName: string; lastName: string }; completedAt?: string; createdAt: string }) => {
     if (project) {
+      // Convert milestone format to match milestones interface
+      const convertedMilestone = {
+        id: updatedMilestone.id,
+        title: updatedMilestone.title,
+        description: updatedMilestone.description,
+        dueDate: updatedMilestone.dueDate,
+        status: updatedMilestone.status,
+        assignedTo: updatedMilestone.assignedTo,
+        completedAt: updatedMilestone.completedAt,
+        createdAt: updatedMilestone.createdAt
+      };
+      
       setProject({
         ...project,
         milestones: project.milestones?.map(m => 
-          m.id === updatedMilestone.id ? updatedMilestone : m
+          m.id === convertedMilestone.id ? convertedMilestone : m
         ) || []
       });
     }
@@ -307,16 +340,16 @@ export default function ProjectDetailsPage() {
               <ArrowLeftIcon className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{project.title || 'Untitled Project'}</h1>
               <p className="text-gray-600">Project Details</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(project.status)}`}>
-              {project.status.replace('_', ' ').toUpperCase()}
+            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(project.status || 'upcoming')}`}>
+              {(project.status || 'upcoming').replace('_', ' ').toUpperCase()}
             </span>
             <a
-              href={`/projects/edit/${project.id}`}
+              href={`/projects/edit/${project.id || ''}`}
               className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center space-x-2"
             >
               <PencilIcon className="w-5 h-5" />
@@ -343,7 +376,7 @@ export default function ProjectDetailsPage() {
               <div className="px-6 py-4 space-y-4">
                 <div>
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
-                  <p className="text-gray-900">{project.description}</p>
+                  <p className="text-gray-900">{project.description || 'No description available'}</p>
                 </div>
 
                 {project.category && (
@@ -772,7 +805,13 @@ export default function ProjectDetailsPage() {
         isOpen={showTeamModal}
         onClose={() => setShowTeamModal(false)}
         projectId={params.id as string}
-        existingMembers={project?.teamMembers || []}
+        existingMembers={(project?.teamMembers || []).map(member => ({
+          userId: member.id,
+          role: member.role,
+          skills: member.skills,
+          responsibilities: member.responsibilities,
+          timeCommitment: member.timeCommitment
+        }))}
         onMemberAdded={handleMemberAdded}
         onMemberRemoved={handleMemberRemoved}
       />
@@ -782,7 +821,16 @@ export default function ProjectDetailsPage() {
         isOpen={showMilestoneModal}
         onClose={() => setShowMilestoneModal(false)}
         projectId={params.id as string}
-        existingMilestones={project?.milestones || []}
+        existingMilestones={(project?.milestones || []).map(milestone => ({
+          id: milestone.id,
+          title: milestone.title,
+          description: milestone.description,
+          dueDate: milestone.dueDate,
+          status: milestone.status,
+          assignedTo: milestone.assignedTo,
+          completedAt: milestone.completedAt,
+          createdAt: milestone.createdAt || new Date().toISOString()
+        }))}
         onMilestoneAdded={handleMilestoneAdded}
         onMilestoneUpdated={handleMilestoneUpdated}
         onMilestoneDeleted={handleMilestoneDeleted}

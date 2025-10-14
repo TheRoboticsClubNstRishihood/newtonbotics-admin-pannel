@@ -99,78 +99,15 @@ export default function RoleApprovals() {
         });
         
         if (response.status === 401) {
-          // Don't logout immediately - show mock data for testing
-          console.log('401 error - showing mock data instead of logging out');
-          const mockData = [
-            {
-              _id: '1',
-              email: 'john.doe@university.edu',
-              allowedRoles: ['student', 'team_member'],
-              note: 'Computer Science student, approved for team projects',
-              isActive: true,
-              createdAt: '2024-01-15T10:30:00.000Z',
-              updatedAt: '2024-01-15T10:30:00.000Z'
-            },
-            {
-              _id: '2',
-              email: 'jane.smith@university.edu',
-              allowedRoles: ['mentor', 'researcher'],
-              note: 'Senior researcher, can mentor students',
-              isActive: true,
-              createdAt: '2024-01-14T09:15:00.000Z',
-              updatedAt: '2024-01-14T09:15:00.000Z'
-            }
-          ];
-          setApprovals(mockData);
-          showError('Backend endpoint not ready. Showing mock data for testing.');
+          showError('Authentication required. Please log in again.');
+          // Redirect to login
+          window.location.href = '/';
         } else if (response.status === 403) {
           showError('Access denied. Admin role required.');
-          // Show mock data for testing even on 403
-          const mockData = [
-            {
-              _id: '1',
-              email: 'john.doe@university.edu',
-              allowedRoles: ['student', 'team_member'],
-              note: 'Computer Science student, approved for team projects',
-              isActive: true,
-              createdAt: '2024-01-15T10:30:00.000Z',
-              updatedAt: '2024-01-15T10:30:00.000Z'
-            },
-            {
-              _id: '2',
-              email: 'jane.smith@university.edu',
-              allowedRoles: ['mentor', 'researcher'],
-              note: 'Senior researcher, can mentor students',
-              isActive: true,
-              createdAt: '2024-01-14T09:15:00.000Z',
-              updatedAt: '2024-01-14T09:15:00.000Z'
-            }
-          ];
-          setApprovals(mockData);
+          setApprovals([]);
         } else {
           showError(`Failed to fetch role approvals: ${errorData.error?.message || 'Unknown error'}`);
-          // Show mock data for other errors too
-          const mockData = [
-            {
-              _id: '1',
-              email: 'john.doe@university.edu',
-              allowedRoles: ['student', 'team_member'],
-              note: 'Computer Science student, approved for team projects',
-              isActive: true,
-              createdAt: '2024-01-15T10:30:00.000Z',
-              updatedAt: '2024-01-15T10:30:00.000Z'
-            },
-            {
-              _id: '2',
-              email: 'jane.smith@university.edu',
-              allowedRoles: ['mentor', 'researcher'],
-              note: 'Senior researcher, can mentor students',
-              isActive: true,
-              createdAt: '2024-01-14T09:15:00.000Z',
-              updatedAt: '2024-01-14T09:15:00.000Z'
-            }
-          ];
-          setApprovals(mockData);
+          setApprovals([]);
         }
       }
     } catch (error) {
@@ -227,7 +164,7 @@ export default function RoleApprovals() {
         
         if (errorData.error?.details?.errors) {
           const errorMessages = errorData.error.details.errors
-            .map((err: any) => `${err.field}: ${err.message}`)
+            .map((err: { field: string; message: string }) => `${err.field}: ${err.message}`)
             .join(', ');
           showError(`Validation failed: ${errorMessages}`);
         } else {

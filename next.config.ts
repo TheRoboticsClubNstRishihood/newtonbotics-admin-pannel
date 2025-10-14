@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Ensure Next.js uses this app directory as the root for output file tracing
+  outputFileTracingRoot: path.join(__dirname),
   images: {
     remotePatterns: [
       {

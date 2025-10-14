@@ -21,7 +21,7 @@ interface EquipmentCategory {
 
 interface EquipmentFormData {
   name: string;
-  categoryId: string;
+  categoryId: string | { id: string };
   description: string;
   modelNumber?: string;
   serialNumber?: string;
@@ -30,10 +30,10 @@ interface EquipmentFormData {
   purchasePrice?: number;
   currentQuantity: number;
   minQuantity: number;
-  maxQuantity: number;
+  maxQuantity?: number;
   location: string;
   imageUrl?: string;
-  specifications: Record<string, any>;
+  specifications: Record<string, string | number | boolean>;
   maintenanceSchedule?: string;
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
@@ -105,92 +105,16 @@ export default function CreateEquipment() {
       if (response.ok) {
         const data = await response.json();
         // Convert _id to id for consistency
-        const processedCategories = (data.data.items || []).map((cat: any) => ({
+        const processedCategories = (data.data.items || []).map((cat: { _id?: string; id?: string; name: string; description?: string }) => ({
           ...cat,
           id: cat._id || cat.id
         }));
         setCategories(processedCategories);
       } else {
         console.log('Backend response:', response.status);
-        // Show mock data for testing
-        const mockCategories = [
-          {
-            id: '68a3221d8519f6402ffd1bd9',
-            name: 'Development Boards',
-            description: 'Microcontrollers, Single Board Computers, and development platforms',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bda',
-            name: 'Sensors & Modules',
-            description: 'Various sensors, breakout boards, and electronic modules',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdb',
-            name: 'Tools & Equipment',
-            description: 'Hand tools, power tools, and laboratory equipment',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdc',
-            name: 'Electronics Components',
-            description: 'Resistors, capacitors, ICs, and other electronic components',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdd',
-            name: 'Cables & Connectors',
-            description: 'USB cables, jumper wires, connectors, and adapters',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          // Subcategories
-          {
-            id: '68a3221d8519f6402ffd1be3',
-            name: 'Arduino Boards',
-            description: 'Arduino Uno, Nano, Mega, and compatible boards',
-            parentCategoryId: '68a3221d8519f6402ffd1bd9',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1be4',
-            name: 'Raspberry Pi',
-            description: 'Raspberry Pi boards and accessories',
-            parentCategoryId: '68a3221d8519f6402ffd1bd9',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1be6',
-            name: 'Environmental Sensors',
-            description: 'Temperature, humidity, pressure, and air quality sensors',
-            parentCategoryId: '68a3221d8519f6402ffd1bda',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1beb',
-            name: 'Measurement Tools',
-            description: 'Multimeters, oscilloscopes, and testing equipment',
-            parentCategoryId: '68a3221d8519f6402ffd1bdb',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          }
-        ];
-
-        setCategories(mockCategories);
-        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+        // No categories available
+        setCategories([]);
+        showError(`Unable to fetch categories (${response.status}). Please try again later.`);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -253,7 +177,7 @@ export default function CreateEquipment() {
       }
 
       // Convert specification fields to object
-      const specifications: Record<string, any> = {};
+      const specifications: Record<string, string | number> = {};
       specificationFields.forEach(field => {
         if (field.key.trim() && field.value.trim()) {
           // Try to parse as number if possible
@@ -308,10 +232,10 @@ export default function CreateEquipment() {
         const responseText = await response.text();
         console.log('Raw response text:', responseText);
         
-        let errorData = {};
+        let errorData: { message?: string; details?: unknown; errors?: unknown } = {};
         try {
           errorData = JSON.parse(responseText);
-        } catch (e) {
+        } catch {
           console.log('Could not parse error response as JSON');
         }
         
@@ -405,7 +329,7 @@ export default function CreateEquipment() {
                   Category <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={formData.categoryId}
+                  value={typeof formData.categoryId === 'string' ? formData.categoryId : ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, categoryId: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                   required

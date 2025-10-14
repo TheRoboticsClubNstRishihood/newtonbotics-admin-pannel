@@ -1,16 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import Image from 'next/image';
 import { 
   XMarkIcon,
   EnvelopeIcon,
   PhoneIcon,
   BuildingOfficeIcon,
   AcademicCapIcon,
-  CalendarIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  UserCircleIcon
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 
 interface User {
@@ -72,10 +70,12 @@ export default function UserDetailModal({ user, isOpen, onClose }: UserDetailMod
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16">
                   {user.profileImageUrl ? (
-                    <img
+                    <Image
                       className="w-16 h-16 rounded-full"
                       src={user.profileImageUrl}
                       alt={`${user.firstName} ${user.lastName}`}
+                      width={64}
+                      height={64}
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center">

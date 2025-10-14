@@ -15,7 +15,7 @@ interface EventFormData {
   location: string;
   maxCapacity: number;
   organizerId: string;
-  category: string;
+  category?: string;
   type: string;
   isFeatured: boolean;
   imageUrl?: string;
@@ -23,9 +23,9 @@ interface EventFormData {
   registrationDeadline?: string;
   registrationFormLink?: string;
   featureOptions?: {
-    showInNav: boolean;
+    showInNav?: boolean;
     navLabel?: string;
-    navOrder: number;
+    navOrder?: number;
   };
 }
 
@@ -110,8 +110,12 @@ export default function CreateEventPage() {
       return;
     }
     
-    if (new Date(formData.startDate) >= new Date(formData.endDate)) {
-      showError('End date must be after start date');
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      console.warn('Create Event validation failed: end date is before start date', {
+        startDate: formData.startDate,
+        endDate: formData.endDate
+      });
+      showError('End date cannot be before start date');
       return;
     }
     
@@ -142,7 +146,7 @@ export default function CreateEventPage() {
         return;
       }
       
-      if (formData.featureOptions.navOrder < 0) {
+      if (formData.featureOptions.navOrder !== undefined && formData.featureOptions.navOrder < 0) {
         showError('Navigation order must be 0 or greater');
         return;
       }
@@ -171,12 +175,43 @@ export default function CreateEventPage() {
       const user = userData ? JSON.parse(userData) : null;
       
       // Prepare the request data with organizerId and proper date formatting
-      const requestData = {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      const isSameDay = start.toDateString() === end.toDateString();
+      if (isSameDay) {
+        console.info('Create Event: same-day detected, normalizing end time to end-of-day');
+        end.setHours(23, 59, 59, 999);
+      }
+      const requestData: any = {
         ...formData,
         organizerId: user?.id || '68a30681af3f3b7d9e2653a3', // Use user ID or fallback
-        startDate: new Date(formData.startDate).toISOString(),
-        endDate: new Date(formData.endDate).toISOString()
+        startDate: start.toISOString(),
+        endDate: end.toISOString()
       };
+
+      // Normalize registrationDeadline to ISO8601 only if provided and registration is required
+      if (formData.requiresRegistration) {
+        if (formData.registrationDeadline) {
+          try {
+            const regDeadlineIso = new Date(formData.registrationDeadline).toISOString();
+            requestData.registrationDeadline = regDeadlineIso;
+            console.info('Create Event: normalized registrationDeadline to ISO8601');
+          } catch {
+            // If parsing fails, leave validation to backend but don't send raw non-ISO
+            delete requestData.registrationDeadline;
+          }
+        } else {
+          delete requestData.registrationDeadline;
+        }
+        // Keep link only if non-empty
+        if (!formData.registrationFormLink || formData.registrationFormLink.trim() === '') {
+          delete requestData.registrationFormLink;
+        }
+      } else {
+        // If registration not required, omit related fields entirely
+        delete requestData.registrationDeadline;
+        delete requestData.registrationFormLink;
+      }
       
       // Remove empty category field to avoid validation issues
       if (!requestData.category || requestData.category.trim() === '') {
@@ -215,7 +250,7 @@ export default function CreateEventPage() {
           errorMessage = errorData.error.message;
         } else if (errorData.error?.details?.errors && Array.isArray(errorData.error.details.errors)) {
           // Handle validation errors array
-          const validationErrors = errorData.error.details.errors.map((err: any) => err.message).join(', ');
+          const validationErrors = errorData.error.details.errors.map((err: { message: string }) => err.message).join(', ');
           errorMessage = validationErrors;
         } else if (errorData.error?.details?.message) {
           errorMessage = errorData.error.details.message;

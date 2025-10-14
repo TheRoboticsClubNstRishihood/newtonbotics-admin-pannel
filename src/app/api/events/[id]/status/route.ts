@@ -1,24 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendUrl } from '@/config/backend';
 
-const backendUrl = getBackendUrl();
+const backendUrl = 'http://localhost:3005';
 
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; milestoneId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
+    if (!id || id === 'undefined') {
+      return NextResponse.json({ success: false, message: 'Invalid event ID' }, { status: 400 });
+    }
+
     const token = request.headers.get('authorization');
     if (!token) {
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const { id, milestoneId } = await params;
     const body = await request.json();
-    console.log('Updating milestone with data:', body);
+    const url = `${backendUrl}/api/events/${id}/status`;
 
-    const response = await fetch(`${backendUrl}/api/projects/${id}/milestones/${milestoneId}`, {
-      method: 'PUT',
+    const response = await fetch(url, {
+      method: 'PATCH',
       headers: {
         'Authorization': token,
         'Content-Type': 'application/json'
@@ -30,17 +34,24 @@ export async function PUT(
 
     if (response.ok) {
       return NextResponse.json(data);
+    } else if (response.status === 404) {
+      return NextResponse.json(
+        { success: false, message: data.message || 'Event not found' },
+        { status: 404 }
+      );
     } else {
       return NextResponse.json(
-        { success: false, message: data.message || 'Failed to update milestone' },
+        { success: false, message: data.message || 'Failed to update status' },
         { status: response.status }
       );
     }
   } catch (error) {
-    console.error('Error updating milestone:', error);
+    console.error('Error updating event status:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 }
     );
   }
 }
+
+

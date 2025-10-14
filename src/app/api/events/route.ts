@@ -52,11 +52,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    // Sanitize and normalize optional fields before forwarding
+    const body: any = { ...rawBody };
+    if (!body.requiresRegistration) {
+      delete body.registrationDeadline;
+      delete body.registrationFormLink;
+    } else {
+      if (typeof body.registrationDeadline === 'string' && body.registrationDeadline.trim() === '') {
+        delete body.registrationDeadline;
+      } else if (body.registrationDeadline) {
+        try {
+          body.registrationDeadline = new Date(body.registrationDeadline).toISOString();
+        } catch {}
+      }
+      if (typeof body.registrationFormLink === 'string' && body.registrationFormLink.trim() === '') {
+        delete body.registrationFormLink;
+      }
+    }
+    // Clean featureOptions when showInNav is false or missing
+    if (!body.featureOptions || body.featureOptions.showInNav !== true) {
+      if (body.featureOptions) {
+        delete body.featureOptions.navLabel;
+        delete body.featureOptions.navOrder;
+      }
+    }
     console.log('Backend URL:', backendUrl);
     console.log('Request body sent to backend:', JSON.stringify(body, null, 2));
 
-    const url = `${backendUrl}/api/events`;
+    const url = `${backendUrl}/api/events/admin`;
     console.log('Calling backend URL:', url);
     
     const response = await fetch(url, {
@@ -73,7 +97,7 @@ export async function POST(request: NextRequest) {
     
     try {
       data = JSON.parse(responseText);
-    } catch (e) {
+    } catch {
       console.error('Failed to parse response as JSON:', responseText);
       return NextResponse.json(
         { success: false, message: 'Invalid response from backend' },

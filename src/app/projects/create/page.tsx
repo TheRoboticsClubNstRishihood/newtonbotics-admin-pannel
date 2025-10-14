@@ -174,7 +174,7 @@ export default function CreateProjectPage() {
       }
       
       // Prepare the project data (without team members) - only include fields with actual values
-      const projectData: any = {
+      const projectData: { title: string; description: string; status: string; priority: string; difficulty: string; isPublic: boolean; isFeatured: boolean; teamLeaderId?: string; estimatedHours?: number; mentorId?: string; startDate?: string; endDate?: string; budget?: number; category?: string; tags?: string[]; requirements?: string[]; deliverables?: string[]; technologies?: string[]; documentation?: string; repositoryUrl?: string; demoUrl?: string; githubUrl?: string; documentationUrl?: string; imageUrl?: string; videoUrl?: string; featuredImageUrl?: string; galleryImages?: string[]; achievements?: string[]; resources?: Array<{ name: string; url: string; type: string }>; milestones?: Array<{ title: string; description: string; dueDate: string; status: string }> } = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         status: formData.status,

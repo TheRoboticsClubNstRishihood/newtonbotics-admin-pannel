@@ -1,19 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { 
   ArrowLeftIcon,
-  UserIcon,
-  CalendarIcon,
   CurrencyDollarIcon,
-  TagIcon,
   PhotoIcon,
   VideoCameraIcon,
   CodeBracketIcon,
   DocumentTextIcon,
-  TrophyIcon,
   HashtagIcon,
   PlusIcon,
   TrashIcon

@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '../../components/AdminLayout';
 import { 
   MagnifyingGlassIcon, 
-  FunnelIcon, 
   ArrowDownTrayIcon,
   UserGroupIcon,
   ChartBarIcon,

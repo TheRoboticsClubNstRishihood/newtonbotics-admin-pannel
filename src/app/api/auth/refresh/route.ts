@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify refresh token
-    const { valid, payload } = AuthService.verifyRefreshToken(refreshToken);
+    const { valid, payload } = await AuthService.verifyRefreshToken(refreshToken);
     
     if (!valid || !payload) {
       return NextResponse.json(

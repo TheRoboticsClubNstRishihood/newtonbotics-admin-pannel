@@ -4,13 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { 
   ArrowLeftIcon,
-  DocumentTextIcon,
-  TagIcon,
-  UserIcon,
-  CalendarIcon,
-  EyeIcon,
-  CheckCircleIcon,
-  XCircleIcon
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../../components/AdminLayout';
 import { useToast } from '../../../../components/ToastContext';
@@ -71,11 +65,12 @@ interface NewsArticle {
     type: 'workshop' | 'event' | 'competition' | 'other';
     requireLogin: boolean;
     formApplyStartDate?: string;
-    formApplyLastDate?: string;
+    formApplyEndDate?: string;
     maxApplicants?: number;
     targetType: 'Workshop' | 'Event' | 'Competition' | 'Other';
     targetId?: string;
     formLink?: string;
+    formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }>;
   };
 }
 
@@ -97,11 +92,12 @@ interface NewsFormData {
     type: 'workshop' | 'event' | 'competition' | 'other';
     requireLogin: boolean;
     formApplyStartDate?: string;
-    formApplyLastDate?: string;
+    formApplyEndDate?: string;
     maxApplicants?: number;
     targetType: 'Workshop' | 'Event' | 'Competition' | 'Other';
     targetId?: string;
     formLink?: string;
+    formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }>;
   };
 }
 
@@ -133,7 +129,7 @@ export default function EditNews() {
       type: 'other',
       requireLogin: false,
       formApplyStartDate: undefined,
-      formApplyLastDate: undefined,
+      formApplyEndDate: undefined,
       maxApplicants: undefined,
       targetType: 'Other',
       targetId: undefined,
@@ -222,12 +218,23 @@ export default function EditNews() {
             isEnabled: fetchedArticle.application?.isEnabled || false,
             type: fetchedArticle.application?.type || 'other',
             requireLogin: fetchedArticle.application?.requireLogin || false,
-            formApplyStartDate: fetchedArticle.application?.formApplyStartDate ? new Date(fetchedArticle.application.formApplyStartDate).toISOString().slice(0, 16) : undefined,
-            formApplyLastDate: fetchedArticle.application?.formApplyLastDate ? new Date(fetchedArticle.application.formApplyLastDate).toISOString().slice(0, 16) : undefined,
+            formApplyStartDate: fetchedArticle.application?.formApplyStartDate
+              ? new Date(fetchedArticle.application.formApplyStartDate).toISOString().slice(0, 16)
+              : undefined,
+            // Prefer deadline if present; fall back to legacy formApplyLastDate
+            formApplyEndDate: fetchedArticle.application?.deadline
+              ? new Date(fetchedArticle.application.deadline).toISOString().slice(0, 16)
+              : (fetchedArticle.application?.formApplyLastDate
+                ? new Date(fetchedArticle.application.formApplyLastDate).toISOString().slice(0, 16)
+                : undefined),
             maxApplicants: fetchedArticle.application?.maxApplicants || undefined,
             targetType: fetchedArticle.application?.targetType || 'Other',
             targetId: fetchedArticle.application?.targetId || undefined,
-            formLink: fetchedArticle.application?.formLink || undefined
+            formLink: fetchedArticle.application?.formLink || undefined,
+            // Preserve existing form fields if present
+            formFields: Array.isArray(fetchedArticle.application?.formFields) && fetchedArticle.application!.formFields.length > 0
+              ? fetchedArticle.application!.formFields
+              : undefined
           }
         });
       } else {
@@ -273,33 +280,9 @@ export default function EditNews() {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to fetch events:', errorData);
         
-        // Show mock data for testing
-        const mockEvents = [
-          {
-            _id: '68b2df886abc19933b13d029',
-            title: 'Robotics Workshop: Introduction to Arduino',
-            description: 'Learn the basics of Arduino programming and robotics in this hands-on workshop.',
-            startDate: '2024-01-15T10:00:00.000Z',
-            endDate: '2024-01-15T16:00:00.000Z',
-            location: 'Engineering Building - Room 101',
-            category: 'workshop',
-            type: 'workshop',
-            status: 'upcoming'
-          },
-          {
-            _id: '68b2df886abc19933b13d030',
-            title: 'AI Competition 2024',
-            description: 'Annual AI competition showcasing innovative projects from students.',
-            startDate: '2024-02-20T09:00:00.000Z',
-            endDate: '2024-02-20T18:00:00.000Z',
-            location: 'Main Auditorium',
-            category: 'competition',
-            type: 'competition',
-            status: 'upcoming'
-          }
-        ];
-        setEvents(mockEvents);
-        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+        // No events available
+        setEvents([]);
+        showError(`Unable to fetch events (${response.status}). Please try again later.`);
       }
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -307,7 +290,7 @@ export default function EditNews() {
     }
   };
 
-  const validateFormData = (data: any) => {
+  const validateFormData = (data: { title?: string; content?: string; application?: { formLink?: string } }) => {
     const errors: string[] = [];
     
     // Check for basic field issues
@@ -360,11 +343,11 @@ export default function EditNews() {
 
     // Validate application dates if enabled
     if (formData.application.isEnabled) {
-      if (formData.application.formApplyStartDate && formData.application.formApplyLastDate) {
+      if (formData.application.formApplyStartDate && formData.application.formApplyEndDate) {
         const startDate = new Date(formData.application.formApplyStartDate);
-        const lastDate = new Date(formData.application.formApplyLastDate);
+        const endDate = new Date(formData.application.formApplyEndDate);
         
-        if (startDate >= lastDate) {
+        if (startDate >= endDate) {
           showError('Application end date must be after start date');
           return;
         }
@@ -380,7 +363,7 @@ export default function EditNews() {
       }
 
       // Prepare data according to backend expectations - only send fields that are being updated
-      const requestData: any = {
+      const requestData: { title: string; content: string; excerpt: string; authorId: string; categoryId: string; isPublished: boolean; tags: string[]; featureOptions: { showInNav: boolean; navLabel: string; navOrder: number }; featuredImage?: string; featuredImageUrl?: string; publishedAt?: string; application?: { isEnabled: boolean; type: string; requireLogin: boolean; targetType?: string; formApplyStartDate?: string | null; formApplyEndDate?: string | null; maxApplicants?: number; formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }> } } = {
         title: formData.title,
         content: formData.content,
         excerpt: formData.excerpt || formData.title,
@@ -407,7 +390,7 @@ export default function EditNews() {
 
       // Add application data if enabled
       if (formData.application.isEnabled) {
-        const applicationData: any = {
+        const applicationData: { isEnabled: boolean; type: string; requireLogin: boolean; targetType: string; formApplyStartDate?: string | null; formApplyEndDate?: string | null; maxApplicants?: number; formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }>; targetId?: string; formLink?: string } = {
           isEnabled: true,
           type: formData.application.type,
           requireLogin: formData.application.requireLogin,
@@ -415,11 +398,16 @@ export default function EditNews() {
         };
 
         // Add new date fields
-        if (formData.application.formApplyStartDate) {
+        // Dates: send ISO strings or null; do not send empty strings
+        if (formData.application.formApplyStartDate === '') {
+          applicationData.formApplyStartDate = null;
+        } else if (formData.application.formApplyStartDate) {
           applicationData.formApplyStartDate = new Date(formData.application.formApplyStartDate).toISOString();
         }
-        if (formData.application.formApplyLastDate) {
-          applicationData.formApplyLastDate = new Date(formData.application.formApplyLastDate).toISOString();
+        if (formData.application.formApplyEndDate === '') {
+          applicationData.formApplyEndDate = null;
+        } else if (formData.application.formApplyEndDate) {
+          applicationData.formApplyEndDate = new Date(formData.application.formApplyEndDate).toISOString();
         }
 
         // Add optional fields only if they have values
@@ -435,6 +423,11 @@ export default function EditNews() {
           applicationData.formLink = formData.application.formLink;
         }
 
+        // Preserve form fields only if user provided/loaded them
+        if (Array.isArray(formData.application.formFields) && formData.application.formFields.length > 0) {
+          applicationData.formFields = formData.application.formFields;
+        }
+
         requestData.application = applicationData;
       } else {
         // If application is disabled, send minimal application data
@@ -442,7 +435,8 @@ export default function EditNews() {
           isEnabled: false,
           type: 'other',
           requireLogin: false,
-          targetType: 'Other'
+          targetType: 'Other',
+          formFields: []
         };
       }
 
@@ -460,8 +454,8 @@ export default function EditNews() {
       }
       
       console.log('Sending update request data:', cleanRequestData);
-      console.log('Application data being sent:', (cleanRequestData as any).application);
-      console.log('Form fields being sent:', (cleanRequestData as any).application?.formFields);
+      console.log('Application data being sent:', cleanRequestData.application);
+      console.log('Form fields being sent:', (cleanRequestData.application as { formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }> })?.formFields);
       console.log('Current window location:', window.location.href);
       console.log('Making fetch request to:', `/api/news/${articleId}`);
       
@@ -804,10 +798,10 @@ export default function EditNews() {
                       </label>
                       <input
                         type="datetime-local"
-                        value={formData.application.formApplyLastDate || ''}
+                        value={formData.application.formApplyEndDate || ''}
                         onChange={(e) => setFormData(prev => ({ 
                           ...prev, 
-                          application: { ...prev.application, formApplyLastDate: e.target.value }
+                          application: { ...prev.application, formApplyEndDate: e.target.value }
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                       />
@@ -915,7 +909,7 @@ export default function EditNews() {
                           </h3>
                           <div className="mt-2 text-sm text-blue-700">
                             <p>When enabled, users will see an application form at the bottom of this news article.</p>
-                            <p className="mt-1">The form will include all the fields you've configured above.</p>
+                            <p className="mt-1">The form will include all the fields you&apos;ve configured above.</p>
                           </div>
                         </div>
                       </div>

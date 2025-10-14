@@ -3,14 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeftIcon,
-  DocumentTextIcon,
-  TagIcon,
-  UserIcon,
-  CalendarIcon,
-  EyeIcon,
-  CheckCircleIcon,
-  XCircleIcon
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../components/AdminLayout';
 import { useToast } from '../../../components/ToastContext';
@@ -53,11 +46,12 @@ interface NewsFormData {
     type: 'workshop' | 'event' | 'competition' | 'other';
     requireLogin: boolean;
     formApplyStartDate?: string;
-    formApplyLastDate?: string;
+    formApplyEndDate?: string;
     maxApplicants?: number;
     targetType: 'Workshop' | 'Event' | 'Competition' | 'Other';
     targetId?: string;
     formLink?: string;
+    formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }>;
   };
 }
 
@@ -87,7 +81,7 @@ export default function CreateNews() {
       type: "other",
       requireLogin: false,
       formApplyStartDate: undefined,
-      formApplyLastDate: undefined,
+      formApplyEndDate: undefined,
       maxApplicants: undefined,
       targetType: "Other",
       targetId: undefined,
@@ -120,8 +114,6 @@ export default function CreateNews() {
       }
 
       console.log('Token being sent:', token);
-      
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
       
       const response = await fetch(`/api/news/categories`, {
         headers: {
@@ -258,11 +250,11 @@ export default function CreateNews() {
 
     // Validate application dates if enabled
     if (formData.application.isEnabled) {
-      if (formData.application.formApplyStartDate && formData.application.formApplyLastDate) {
+      if (formData.application.formApplyStartDate && formData.application.formApplyEndDate) {
         const startDate = new Date(formData.application.formApplyStartDate);
-        const lastDate = new Date(formData.application.formApplyLastDate);
+        const endDate = new Date(formData.application.formApplyEndDate);
         
-        if (startDate >= lastDate) {
+        if (startDate >= endDate) {
           showError('Application end date must be after start date');
           return;
         }
@@ -280,7 +272,7 @@ export default function CreateNews() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
       
       // Prepare data according to backend expectations
-      const requestData: any = {
+      const requestData: { title: string; content: string; excerpt: string; authorId: string; categoryId: string; isPublished: boolean; tags: string[]; featureOptions: { showInNav: boolean; navLabel: string; navOrder: number }; featuredImage?: string; featuredImageUrl?: string; publishedAt?: string; application?: { isEnabled: boolean; type: string; requireLogin: boolean; targetType?: string; formApplyStartDate?: string | null; formApplyEndDate?: string | null; maxApplicants?: number; formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }> } } = {
         title: formData.title,
         content: formData.content,
         excerpt: formData.excerpt || formData.title,
@@ -307,7 +299,7 @@ export default function CreateNews() {
 
       // Add application data if enabled
       if (formData.application.isEnabled) {
-        const applicationData: any = {
+        const applicationData: { isEnabled: boolean; type: string; requireLogin: boolean; targetType: string; formApplyStartDate?: string | null; formApplyEndDate?: string | null; maxApplicants?: number; formFields?: Array<{ name: string; type: string; label: string; required: boolean; options?: string[] }>; targetId?: string; formLink?: string } = {
           isEnabled: true,
           type: formData.application.type,
           requireLogin: formData.application.requireLogin,
@@ -315,11 +307,21 @@ export default function CreateNews() {
         };
 
         // Add new date fields
-        if (formData.application.formApplyStartDate) {
+        // Dates: send ISO strings or null; do not send empty strings
+        if (formData.application.formApplyStartDate === '') {
+          applicationData.formApplyStartDate = null;
+        } else if (formData.application.formApplyStartDate) {
           applicationData.formApplyStartDate = new Date(formData.application.formApplyStartDate).toISOString();
         }
-        if (formData.application.formApplyLastDate) {
-          applicationData.formApplyLastDate = new Date(formData.application.formApplyLastDate).toISOString();
+        if (formData.application.formApplyEndDate === '') {
+          applicationData.formApplyEndDate = null;
+        } else if (formData.application.formApplyEndDate) {
+          applicationData.formApplyEndDate = new Date(formData.application.formApplyEndDate).toISOString();
+        }
+
+        // Include formFields only if present
+        if (Array.isArray(formData.application.formFields) && formData.application.formFields.length > 0) {
+          applicationData.formFields = formData.application.formFields;
         }
 
         // Add optional fields only if they have values
@@ -342,7 +344,8 @@ export default function CreateNews() {
           isEnabled: false,
           type: 'other',
           requireLogin: false,
-          targetType: 'Other'
+          targetType: 'Other',
+          formFields: []
         };
       }
       
@@ -352,7 +355,7 @@ export default function CreateNews() {
       );
       
       console.log('Sending request data:', cleanRequestData);
-      console.log('Application data being sent:', (cleanRequestData as any).application);
+      console.log('Application data being sent:', cleanRequestData.application);
       
       const response = await fetch(`/api/news/admin`, {
         method: 'POST',
@@ -656,10 +659,10 @@ export default function CreateNews() {
                       </label>
                       <input
                         type="datetime-local"
-                        value={formData.application.formApplyLastDate || ''}
+                        value={formData.application.formApplyEndDate || ''}
                         onChange={(e) => setFormData(prev => ({ 
                           ...prev, 
-                          application: { ...prev.application, formApplyLastDate: e.target.value }
+                          application: { ...prev.application, formApplyEndDate: e.target.value }
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
                       />
@@ -763,7 +766,7 @@ export default function CreateNews() {
                           </h3>
                           <div className="mt-2 text-sm text-blue-700">
                             <p>When enabled, users will see an application form at the bottom of this news article.</p>
-                            <p className="mt-1">The form will include all the fields you've configured above.</p>
+                            <p className="mt-1">The form will include all the fields you&apos;ve configured above.</p>
                           </div>
                         </div>
                       </div>

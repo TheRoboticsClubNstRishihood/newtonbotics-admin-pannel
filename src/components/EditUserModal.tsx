@@ -64,7 +64,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
         preferences: user.preferences || { notifications: true, newsletter: true }
       });
     }
-  }, [user]);
+  }, [user, isOpen]);
 
   // Early return after all hooks are called
   if (!user) {
@@ -72,7 +72,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
     return null;
   }
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | boolean | number | undefined | User['preferences'] | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -108,7 +108,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
       }
 
       // Only send fields that have been changed from their original values
-      const changedFields: any = {};
+      const changedFields: Record<string, unknown> = {};
       
       // Compare current form data with original user data
       Object.entries(formData).forEach(([key, value]) => {
@@ -157,7 +157,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
       // Optional: Validate phone number format if provided (but don't block submission)
       if (changedFields.phone && changedFields.phone !== null && changedFields.phone !== '') {
         const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-        if (!phoneRegex.test(changedFields.phone.replace(/[\s\-\(\)]/g, ''))) {
+        if (typeof changedFields.phone === 'string' && !phoneRegex.test(changedFields.phone.replace(/[\s\-\(\)]/g, ''))) {
           console.warn('Phone number format may be invalid, but allowing submission');
         }
       }
@@ -419,8 +419,8 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                         id="notifications"
                         checked={formData.preferences.notifications || false}
                         onChange={(e) => handleInputChange('preferences', {
-                          ...formData.preferences,
-                          notifications: e.target.checked
+                          notifications: e.target.checked,
+                          newsletter: formData.preferences?.newsletter ?? true
                         })}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
@@ -435,7 +435,7 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                         id="newsletter"
                         checked={formData.preferences.newsletter || false}
                         onChange={(e) => handleInputChange('preferences', {
-                          ...formData.preferences,
+                          notifications: formData.preferences?.notifications ?? true,
                           newsletter: e.target.checked
                         })}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"

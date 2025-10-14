@@ -92,10 +92,10 @@ export async function POST(request: NextRequest) {
       const responseText = await response.text();
       console.log('Backend response text:', responseText);
       
-      let errorData = {};
+      let errorData: { message?: string; error?: { message?: string; details?: unknown }; details?: unknown } = {};
       try {
         errorData = JSON.parse(responseText);
-      } catch (e) {
+      } catch {
         console.log('Could not parse backend error as JSON');
       }
       

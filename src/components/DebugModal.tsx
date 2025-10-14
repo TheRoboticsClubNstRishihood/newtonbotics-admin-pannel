@@ -6,7 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 interface DebugModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
+  user: { id?: string; email?: string; firstName?: string; lastName?: string; role?: string } | null;
 }
 
 export default function DebugModal({ isOpen, onClose, user }: DebugModalProps) {

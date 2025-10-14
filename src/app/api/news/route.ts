@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
     if (categoryId) queryParams.append('categoryId', categoryId);
     if (search) queryParams.append('search', search);
 
-    // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
+    // Make request to your backend API (prefer server-side envs)
+    const backendUrl = process.env.BACKEND_URL || process.env.DEV_BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/news?${queryParams}`, {
       headers: {
         'Authorization': authHeader,
@@ -51,8 +51,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    const raw = await response.json();
+
+    // Normalize to always return { success, data: { items, pagination? } }
+    const items =
+      (raw && raw.data && Array.isArray(raw.data.items) && raw.data.items) ||
+      (raw && raw.data && Array.isArray(raw.data.articles) && raw.data.articles) ||
+      (raw && raw.data && Array.isArray(raw.data.news) && raw.data.news) ||
+      (raw && Array.isArray(raw.items) && raw.items) ||
+      (raw && Array.isArray(raw.articles) && raw.articles) ||
+      (raw && Array.isArray(raw.news) && raw.news) ||
+      (raw && Array.isArray(raw.data) && raw.data) ||
+      (Array.isArray(raw) ? raw : []);
+
+    const pagination =
+      (raw && raw.data && raw.data.pagination) ||
+      raw.pagination ||
+      {
+        total: typeof raw.total === 'number' ? raw.total : items.length,
+        limit: Number(new URL(request.url).searchParams.get('limit') || '20'),
+        skip: Number(new URL(request.url).searchParams.get('skip') || '0'),
+        hasMore: false
+      };
+
+    return NextResponse.json({ success: true, data: { items, pagination } });
   } catch (error) {
     console.error('Error fetching news articles:', error);
     return NextResponse.json(
@@ -82,8 +104,8 @@ export async function POST(request: NextRequest) {
 
     console.log('API Route - Received body:', body);
 
-    // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
+    // Make request to your backend API (prefer server-side envs)
+    const backendUrl = process.env.BACKEND_URL || process.env.DEV_BACKEND_URL || 'http://localhost:3005';
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - Environment variables:', {
       BACKEND_URL: process.env.BACKEND_URL,
