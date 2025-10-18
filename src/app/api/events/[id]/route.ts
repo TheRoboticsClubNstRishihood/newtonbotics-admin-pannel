@@ -64,10 +64,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    console.log('Backend URL:', `${backendUrl}/api/events/admin/${id}`);
+    console.log('Backend URL:', `${backendUrl}/api/events/${id}`);
     console.log('Event ID:', id);
 
-    const response = await fetch(`${backendUrl}/api/events/admin/${id}`, {
+    const response = await fetch(`${backendUrl}/api/events/${id}`, {
       method: 'PUT',
       headers: {
         'Authorization': token,

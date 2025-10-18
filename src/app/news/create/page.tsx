@@ -127,33 +127,8 @@ export default function CreateNews() {
         setCategories(data.data.categories || []);
       } else {
         console.log('Backend response:', response.status);
-        // Show mock data for testing
-        const mockCategories = [
-          {
-            _id: '1',
-            id: '1',
-            name: 'Achievements',
-            description: 'Team achievements and awards',
-            createdAt: '2023-09-01T08:00:00.000Z'
-          },
-          {
-            _id: '2',
-            id: '2',
-            name: 'Workshops',
-            description: 'Workshop announcements and updates',
-            createdAt: '2023-09-01T08:00:00.000Z'
-          },
-          {
-            _id: '3',
-            id: '3',
-            name: 'Events',
-            description: 'Upcoming events and announcements',
-            createdAt: '2023-09-01T08:00:00.000Z'
-          }
-        ];
-
-        setCategories(mockCategories);
-        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+        setCategories([]);
+        showError(`Failed to load categories (${response.status}). Please try again later.`);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -185,34 +160,8 @@ export default function CreateNews() {
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to fetch events:', errorData);
-        
-        // Show mock data for testing
-        const mockEvents = [
-          {
-            _id: '68b2df886abc19933b13d029',
-            title: 'Robotics Workshop: Introduction to Arduino',
-            description: 'Learn the basics of Arduino programming and robotics in this hands-on workshop.',
-            startDate: '2024-01-15T10:00:00.000Z',
-            endDate: '2024-01-15T16:00:00.000Z',
-            location: 'Engineering Building - Room 101',
-            category: 'workshop',
-            type: 'workshop',
-            status: 'upcoming'
-          },
-          {
-            _id: '68b2df886abc19933b13d030',
-            title: 'AI Competition 2024',
-            description: 'Annual AI competition showcasing innovative projects from students.',
-            startDate: '2024-02-20T09:00:00.000Z',
-            endDate: '2024-02-20T18:00:00.000Z',
-            location: 'Main Auditorium',
-            category: 'competition',
-            type: 'competition',
-            status: 'upcoming'
-          }
-        ];
-        setEvents(mockEvents);
-        showError(`Backend endpoint not ready (${response.status}). Showing mock data for testing.`);
+        setEvents([]);
+        showError(`Failed to load events (${response.status}). Please try again later.`);
       }
     } catch (error) {
       console.error('Error fetching events:', error);

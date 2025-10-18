@@ -137,9 +137,19 @@ export default function ProjectDetailsPage() {
       });
 
       const data = await response.json();
+      console.log('ProjectDetailsPage: fetched project response', data);
 
       if (data.success) {
-        setProject(data.data);
+        // Normalize possible shapes: {data: {project: {...}}} or {data: {...}} or {project: {...}}
+        const raw = (data?.data && (data.data.project || data.data)) || data.project || data.item || {};
+        // Map backend keys to UI expectations
+        const normalized = {
+          ...raw,
+          mentor: raw.mentor || raw.mentorId, // backend sends mentorId as object
+          teamLeader: raw.teamLeader || raw.teamLeaderId
+        } as any;
+        console.log('ProjectDetailsPage: normalized projectData', normalized);
+        setProject(normalized);
       } else {
         setError(data.message || 'Failed to fetch project details');
       }
@@ -447,37 +457,34 @@ export default function ProjectDetailsPage() {
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-medium text-gray-900">Current Team Members</h3>
-                <button 
-                  onClick={() => setShowTeamModal(true)}
-                  className="text-indigo-600 hover:text-indigo-900 flex items-center space-x-1"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  <span className="text-sm">Add Member</span>
-                </button>
               </div>
               <div className="px-6 py-4">
                 {project.teamMembers && project.teamMembers.length > 0 ? (
                   <div className="space-y-4">
-                    {project.teamMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-sm font-medium">
-                              {member.firstName.charAt(0)}{member.lastName.charAt(0)}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {member.firstName} {member.lastName}
-                            </p>
-                            <p className="text-sm text-gray-500">{member.role}</p>
+                    {project.teamMembers.map((member, index) => {
+                      const user = (member as any).user || (member as any).userId || member;
+                      const firstName = (member as any).firstName || user?.firstName || ((member as any).name ? String((member as any).name).split(' ')[0] : '');
+                      const lastName = (member as any).lastName || user?.lastName || ((member as any).name ? String((member as any).name).split(' ').slice(1).join(' ') : '');
+                      const initials = `${(firstName?.charAt?.(0) || '').toUpperCase()}${(lastName?.charAt?.(0) || '').toUpperCase()}` || 'TM';
+                      const key = (member as any).id || user?.id || user?._id || (member as any).userId || `member-${index}`;
+                      return (
+                        <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-medium">
+                                {initials}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {firstName || 'Team'} {lastName || 'Member'}
+                              </p>
+                              <p className="text-sm text-gray-500">{(member as any).role || 'Member'}</p>
+                            </div>
                           </div>
                         </div>
-                        <button className="text-red-600 hover:text-red-900 text-sm">
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-gray-500 text-center py-4">No team members assigned</p>
@@ -545,13 +552,6 @@ export default function ProjectDetailsPage() {
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-medium text-gray-900">Milestones</h3>
-                <button 
-                  onClick={() => setShowMilestoneModal(true)}
-                  className="text-indigo-600 hover:text-indigo-900 flex items-center space-x-1"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  <span className="text-sm">Add Milestone</span>
-                </button>
               </div>
               <div className="px-6 py-4">
                 {project.milestones && project.milestones.length > 0 ? (
@@ -800,41 +800,7 @@ export default function ProjectDetailsPage() {
         </div>
       </div>
 
-      {/* Team Member Modal */}
-      <TeamMemberModal
-        isOpen={showTeamModal}
-        onClose={() => setShowTeamModal(false)}
-        projectId={params.id as string}
-        existingMembers={(project?.teamMembers || []).map(member => ({
-          userId: member.id,
-          role: member.role,
-          skills: member.skills,
-          responsibilities: member.responsibilities,
-          timeCommitment: member.timeCommitment
-        }))}
-        onMemberAdded={handleMemberAdded}
-        onMemberRemoved={handleMemberRemoved}
-      />
-
-      {/* Milestone Modal */}
-      <MilestoneModal
-        isOpen={showMilestoneModal}
-        onClose={() => setShowMilestoneModal(false)}
-        projectId={params.id as string}
-        existingMilestones={(project?.milestones || []).map(milestone => ({
-          id: milestone.id,
-          title: milestone.title,
-          description: milestone.description,
-          dueDate: milestone.dueDate,
-          status: milestone.status,
-          assignedTo: milestone.assignedTo,
-          completedAt: milestone.completedAt,
-          createdAt: milestone.createdAt || new Date().toISOString()
-        }))}
-        onMilestoneAdded={handleMilestoneAdded}
-        onMilestoneUpdated={handleMilestoneUpdated}
-        onMilestoneDeleted={handleMilestoneDeleted}
-      />
+      {/* Modals removed on read-only page; editing happens in edit view */}
     </AdminLayout>
   );
 }

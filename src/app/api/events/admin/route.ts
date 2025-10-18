@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
 
-const backendUrl = 'http://localhost:3005';
+const backendUrl = getBackendUrl();
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const queryString = searchParams.toString();
-    const url = `${backendUrl}/api/events/admin${queryString ? `?${queryString}` : ''}`;
+    const url = `${backendUrl}/api/events${queryString ? `?${queryString}` : ''}`;
 
     const response = await fetch(url, {
       headers: {
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const url = `${backendUrl}/api/events/admin`;
+    const url = `${backendUrl}/api/events`;
 
     const response = await fetch(url, {
       method: 'POST',

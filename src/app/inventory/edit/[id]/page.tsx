@@ -181,84 +181,9 @@ export default function EditEquipment() {
         setCategories(processedCategories);
         setCategoriesLoaded(true);
       } else {
-        // Show mock categories for testing
-        const mockCategories = [
-          {
-            id: '68a3221d8519f6402ffd1bd9',
-            name: 'Development Boards',
-            description: 'Microcontrollers, Single Board Computers, and development platforms',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bda',
-            name: 'Sensors & Modules',
-            description: 'Various sensors, breakout boards, and electronic modules',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdb',
-            name: 'Tools & Equipment',
-            description: 'Hand tools, power tools, and laboratory equipment',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdc',
-            name: 'Electronics Components',
-            description: 'Resistors, capacitors, ICs, and other electronic components',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1bdd',
-            name: 'Cables & Connectors',
-            description: 'USB cables, jumper wires, connectors, and adapters',
-            parentCategoryId: null,
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          // Subcategories
-          {
-            id: '68a3221d8519f6402ffd1be3',
-            name: 'Arduino Boards',
-            description: 'Arduino Uno, Nano, Mega, and compatible boards',
-            parentCategoryId: '68a3221d8519f6402ffd1bd9',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1be4',
-            name: 'Raspberry Pi',
-            description: 'Raspberry Pi boards and accessories',
-            parentCategoryId: '68a3221d8519f6402ffd1bd9',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1be6',
-            name: 'Environmental Sensors',
-            description: 'Temperature, humidity, pressure, and air quality sensors',
-            parentCategoryId: '68a3221d8519f6402ffd1bda',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          },
-          {
-            id: '68a3221d8519f6402ffd1beb',
-            name: 'Measurement Tools',
-            description: 'Multimeters, oscilloscopes, and testing equipment',
-            parentCategoryId: '68a3221d8519f6402ffd1bdb',
-            createdAt: '2025-08-18T12:52:45.653Z',
-            updatedAt: '2025-08-18T12:52:45.653Z'
-          }
-        ];
-        setCategories(mockCategories);
+        setCategories([]);
         setCategoriesLoaded(true);
+        console.error('Failed to fetch categories:', response.status);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);

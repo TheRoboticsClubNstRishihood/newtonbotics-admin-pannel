@@ -24,66 +24,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     } else {
       console.error('Backend error:', data);
-      
-      // Return mock data for testing when backend is not available
-      const mockStatistics = {
-        totalUsers: 156,
-        activeUsers: 142,
-        inactiveUsers: 14,
-        newUsersThisMonth: 23,
-        roleDistribution: [
-          { role: 'student', count: 89 },
-          { role: 'team_member', count: 34 },
-          { role: 'mentor', count: 12 },
-          { role: 'researcher', count: 8 },
-          { role: 'admin', count: 3 }
-        ],
-        departmentDistribution: [
-          { department: 'Computer Science', count: 45 },
-          { department: 'Electrical Engineering', count: 32 },
-          { department: 'Mechanical Engineering', count: 28 },
-          { department: 'Information Technology', count: 25 },
-          { department: 'Robotics Engineering', count: 26 }
-        ]
-      };
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          statistics: mockStatistics
-        }
-      });
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to fetch user statistics from backend',
+        error: data 
+      }, { status: response.status });
     }
   } catch (error) {
     console.error('Error fetching user statistics:', error);
-    
-    // Return mock data for testing when network error occurs
-    const mockStatistics = {
-      totalUsers: 156,
-      activeUsers: 142,
-      inactiveUsers: 14,
-      newUsersThisMonth: 23,
-      roleDistribution: [
-        { role: 'student', count: 89 },
-        { role: 'team_member', count: 34 },
-        { role: 'mentor', count: 12 },
-        { role: 'researcher', count: 8 },
-        { role: 'admin', count: 3 }
-      ],
-      departmentDistribution: [
-        { department: 'Computer Science', count: 45 },
-        { department: 'Electrical Engineering', count: 32 },
-        { department: 'Mechanical Engineering', count: 28 },
-        { department: 'Information Technology', count: 25 },
-        { department: 'Robotics Engineering', count: 26 }
-      ]
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        statistics: mockStatistics
-      }
-    });
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Network error while fetching user statistics',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

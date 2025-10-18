@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
 
-const backendUrl = 'http://localhost:3005';
+const backendUrl = getBackendUrl();
 
 export async function PUT(
   request: NextRequest,
@@ -41,7 +42,7 @@ export async function PUT(
         delete body.featureOptions.navOrder;
       }
     }
-    const url = `${backendUrl}/api/events/admin/${id}`;
+    const url = `${backendUrl}/api/events/${id}`;
 
     const response = await fetch(url, {
       method: 'PUT',

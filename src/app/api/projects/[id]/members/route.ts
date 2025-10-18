@@ -56,7 +56,22 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json();
-    console.log('Adding team member with data:', body);
+    console.log('Adding team member with data (incoming):', body);
+
+    // Normalize payload to match backend expectations
+    const normalized: any = {
+      userId: body.userId || body.memberId,
+      memberId: body.memberId || body.userId, // send both just in case backend expects memberId
+      role: body.role,
+      skills: Array.isArray(body.skills) ? body.skills : (typeof body.skills === 'string' && body.skills ? body.skills.split(',').map((s: string) => s.trim()) : undefined),
+      responsibilities: Array.isArray(body.responsibilities) ? body.responsibilities : (typeof body.responsibilities === 'string' && body.responsibilities ? body.responsibilities.split(',').map((r: string) => r.trim()) : undefined),
+      timeCommitment: body.timeCommitment && typeof body.timeCommitment.hoursPerWeek !== 'undefined' ? { hoursPerWeek: Number(body.timeCommitment.hoursPerWeek) } : undefined,
+      hoursPerWeek: typeof body.hoursPerWeek !== 'undefined' ? Number(body.hoursPerWeek) : (body.timeCommitment?.hoursPerWeek != null ? Number(body.timeCommitment.hoursPerWeek) : undefined),
+      contribution: body.contribution || undefined
+    };
+    // Remove undefined keys
+    Object.keys(normalized).forEach((k) => normalized[k] === undefined && delete normalized[k]);
+    console.log('Adding team member with data (normalized):', normalized);
 
     const response = await fetch(`${backendUrl}/api/projects/${id}/members`, {
       method: 'POST',
@@ -64,7 +79,7 @@ export async function POST(
         'Authorization': token,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(normalized)
     });
 
     const data = await response.json();
@@ -72,8 +87,10 @@ export async function POST(
     if (response.ok) {
       return NextResponse.json(data);
     } else {
+      console.error('Backend failed to add team member', { status: response.status, data });
+      const message = (data && (data.message || data.error?.message || data.error)) || 'Failed to add team member';
       return NextResponse.json(
-        { success: false, message: data.message || 'Failed to add team member' },
+        { success: false, message, details: data },
         { status: response.status }
       );
     }

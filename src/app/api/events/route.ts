@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
 
-const backendUrl = 'http://localhost:3005';
-console.log('Environment BACKEND_URL:', process.env.BACKEND_URL);
-console.log('Using backend URL:', backendUrl);
+const backendUrl = getBackendUrl();
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,7 +79,7 @@ export async function POST(request: NextRequest) {
     console.log('Backend URL:', backendUrl);
     console.log('Request body sent to backend:', JSON.stringify(body, null, 2));
 
-    const url = `${backendUrl}/api/events/admin`;
+    const url = `${backendUrl}/api/events`;
     console.log('Calling backend URL:', url);
     
     const response = await fetch(url, {
