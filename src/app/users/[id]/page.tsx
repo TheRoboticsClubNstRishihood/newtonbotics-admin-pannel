@@ -8,21 +8,15 @@ import {
   PhoneIcon,
   BuildingOfficeIcon,
   AcademicCapIcon,
-  CalendarIcon,
   CheckCircleIcon,
   XCircleIcon,
-  UserCircleIcon,
   PencilIcon,
   TrashIcon,
   ArrowPathIcon,
-  ClockIcon,
   ShieldCheckIcon,
-  CogIcon,
   BellIcon,
   HeartIcon,
-  StarIcon,
-  MapPinIcon,
-  GlobeAltIcon
+  StarIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../components/AdminLayout';
 import EditUserModal from '../../../components/EditUserModal';

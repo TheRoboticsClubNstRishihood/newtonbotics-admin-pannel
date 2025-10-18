@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '../../components/AdminLayout';
+import NewsletterStats from '../../components/NewsletterStats';
+import NewsletterNavigation from '../../components/NewsletterNavigation';
 import { 
   MagnifyingGlassIcon, 
-  FunnelIcon, 
-  ArrowDownTrayIcon,
-  UserGroupIcon,
-  ChartBarIcon,
-  EnvelopeIcon
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 
 interface NewsletterSubscription {
@@ -85,8 +83,13 @@ export default function NewsletterPage() {
 
   const fetchSubscriptions = async () => {
     try {
+      console.log('🔄 Frontend: Fetching subscriptions...');
       const token = localStorage.getItem('accessToken');
-      if (!token) return;
+      console.log('🔑 Frontend: Token present:', !!token);
+      if (!token) {
+        console.log('❌ Frontend: No token found');
+        return;
+      }
 
       const params = new URLSearchParams({
         limit: limit.toString(),
@@ -98,19 +101,33 @@ export default function NewsletterPage() {
       if (searchQuery) params.set('q', searchQuery);
       if (statusFilter !== 'all') params.set('status', statusFilter);
 
-      const response = await fetch(`/api/newsletter/admin/subscriptions?${params}`, {
+      const apiUrl = `/api/newsletter/admin/subscriptions?${params}`;
+      console.log('🌐 Frontend: Making request to:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
+      console.log('📡 Frontend: Response status:', response.status);
+      console.log('📡 Frontend: Response ok:', response.ok);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Frontend: Successfully fetched subscriptions:', data);
         setSubscriptions(data.data.subscriptions);
         setTotalCount(data.data.pagination.total);
       } else {
-        setError('Failed to fetch subscriptions');
+        const errorData = await response.json();
+        console.log('❌ Frontend: Error response:', errorData);
+        
+        if (errorData.error === 'BACKEND_API_NOT_AVAILABLE') {
+          setError('Newsletter admin API is not implemented on the backend server. Please contact the development team to implement the required API endpoints.');
+        } else {
+          setError(errorData.message || 'Failed to fetch subscriptions');
+        }
       }
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
@@ -120,6 +137,7 @@ export default function NewsletterPage() {
 
   const fetchStatistics = async () => {
     try {
+      console.log('🔄 Frontend: Fetching statistics...');
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
@@ -130,9 +148,20 @@ export default function NewsletterPage() {
         }
       });
 
+      console.log('📡 Frontend: Statistics response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Frontend: Successfully fetched statistics:', data);
         setStats(data.data);
+      } else {
+        const errorData = await response.json();
+        console.log('❌ Frontend: Statistics error response:', errorData);
+        
+        if (errorData.error === 'BACKEND_API_NOT_AVAILABLE') {
+          console.log('⚠️ Backend statistics API not available - will show empty stats');
+          // Don't set error for statistics, just don't show stats
+        }
       }
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -260,95 +289,13 @@ export default function NewsletterPage() {
   }
 
   return (
-    <AdminLayout pageTitle="Newsletter Subscriptions">
+    <AdminLayout pageTitle="Newsletter Management">
       <div className="space-y-6">
-        {/* Statistics Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <EnvelopeIcon className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Subscriptions</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.totalSubscriptions}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <UserGroupIcon className="h-6 w-6 text-green-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Active</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.activeSubscriptions}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <UserGroupIcon className="h-6 w-6 text-red-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Inactive</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.inactiveSubscriptions}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ChartBarIcon className="h-6 w-6 text-blue-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Recent Subscriptions</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.recentSubscriptions}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ChartBarIcon className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Recent Unsubscriptions</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.recentUnsubscriptions}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <NewsletterNavigation />
+        {stats && <NewsletterStats type="subscriptions" subscriptionStats={stats} />}
 
         {/* Filters and Actions */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow rounded-lg newsletter-form">
           <div className="px-4 py-5 sm:p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
               {/* Search and Filters */}

@@ -24,46 +24,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     } else {
       console.error('Backend error:', data);
-      
-      // Return mock data for testing when backend is not available
-      const mockDepartments = [
-        'Computer Science',
-        'Electrical Engineering',
-        'Mechanical Engineering',
-        'Information Technology',
-        'Robotics Engineering',
-        'Artificial Intelligence',
-        'Data Science',
-        'Software Engineering'
-      ];
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          departments: mockDepartments
-        }
-      });
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to fetch departments from backend',
+        error: data 
+      }, { status: response.status });
     }
   } catch (error) {
     console.error('Error fetching departments:', error);
-    
-    // Return mock data for testing when network error occurs
-    const mockDepartments = [
-      'Computer Science',
-      'Electrical Engineering',
-      'Mechanical Engineering',
-      'Information Technology',
-      'Robotics Engineering',
-      'Artificial Intelligence',
-      'Data Science',
-      'Software Engineering'
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        departments: mockDepartments
-      }
-    });
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Network error while fetching departments',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

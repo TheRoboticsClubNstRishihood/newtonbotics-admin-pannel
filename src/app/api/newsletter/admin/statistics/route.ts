@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const backendUrl = 'http://localhost:3005';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-servers-chi.vercel.app';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,9 +26,14 @@ export async function GET(request: NextRequest) {
     if (response.ok) {
       return NextResponse.json(data);
     } else {
+      console.log('❌ Backend statistics API not available');
       return NextResponse.json(
-        { success: false, message: data.message || data.error?.message || 'Failed to fetch newsletter statistics' },
-        { status: response.status }
+        { 
+          success: false, 
+          message: `Backend API not available: ${data.message || data.error?.message || 'Newsletter statistics API not implemented on backend server'}`,
+          error: 'BACKEND_API_NOT_AVAILABLE'
+        },
+        { status: 503 }
       );
     }
   } catch (error) {

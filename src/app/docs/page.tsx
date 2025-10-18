@@ -16,7 +16,7 @@ import {
 interface DocSection {
   id: string;
   title: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   description: string;
   content: string;
 }

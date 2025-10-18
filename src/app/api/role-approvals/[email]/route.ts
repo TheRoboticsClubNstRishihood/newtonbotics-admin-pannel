@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { email: string } }
+  { params }: { params: Promise<{ email: string }> }
 ) {
+  const { email } = await params;
   try {
     const token = request.headers.get('authorization');
     if (!token) {
@@ -12,7 +13,7 @@ export async function GET(
           success: false, 
           error: { message: 'Authentication required. Please log in.' },
           timestamp: new Date().toISOString(),
-          path: `/api/role-approvals/${params.email}`,
+          path: `/api/role-approvals/${email}`,
           method: 'GET'
         },
         { status: 401 }
@@ -20,7 +21,7 @@ export async function GET(
     }
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
-    const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(params.email)}`, {
+    const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(email)}`, {
       headers: {
         'Authorization': token,
         'Content-Type': 'application/json'
@@ -36,7 +37,7 @@ export async function GET(
         success: false, 
         error: { message: 'Internal server error' },
         timestamp: new Date().toISOString(),
-        path: `/api/role-approvals/${params.email}`,
+        path: `/api/role-approvals/${email}`,
         method: 'GET'
       },
       { status: 500 }
@@ -46,8 +47,9 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { email: string } }
+  { params }: { params: Promise<{ email: string }> }
 ) {
+  const { email } = await params;
   try {
     const token = request.headers.get('authorization');
     if (!token) {
@@ -56,7 +58,7 @@ export async function DELETE(
           success: false, 
           error: { message: 'Authentication required. Please log in.' },
           timestamp: new Date().toISOString(),
-          path: `/api/role-approvals/${params.email}`,
+          path: `/api/role-approvals/${email}`,
           method: 'DELETE'
         },
         { status: 401 }
@@ -64,7 +66,7 @@ export async function DELETE(
     }
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
-    const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(params.email)}`, {
+    const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(email)}`, {
       method: 'DELETE',
       headers: {
         'Authorization': token,
@@ -81,7 +83,7 @@ export async function DELETE(
         success: false, 
         error: { message: 'Internal server error' },
         timestamp: new Date().toISOString(),
-        path: `/api/role-approvals/${params.email}`,
+        path: `/api/role-approvals/${email}`,
         method: 'DELETE'
       },
       { status: 500 }

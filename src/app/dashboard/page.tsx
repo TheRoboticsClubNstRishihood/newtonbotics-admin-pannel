@@ -6,17 +6,8 @@ import {
   CalendarIcon,
   AcademicCapIcon,
   NewspaperIcon,
-  UserGroupIcon,
-  PhotoIcon,
   UsersIcon,
-  Cog6ToothIcon,
   DocumentTextIcon,
-  ArrowRightOnRectangleIcon,
-  BellIcon,
-  UserCircleIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CheckCircleIcon,
   ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
@@ -173,51 +164,28 @@ export default function Dashboard() {
       const newsData = await newsResponse.json();
       const newsletterData = await newsletterResponse.json();
 
-      // Mock stats for now - replace with actual API calls
+      // Set stats from API data
       setStats({
         totalUsers: usersData.success ? usersData.data?.users?.length || 0 : 0,
         totalNews: newsData.success ? newsData.data?.items?.length || 0 : 0,
-        totalEvents: 5, // Mock data
-        totalWorkshops: 3, // Mock data
+        totalEvents: 0, // Will be fetched from events API when available
+        totalWorkshops: 0, // Will be fetched from workshops API when available
         newsletterStats: newsletterData.success ? {
           totalSubscriptions: newsletterData.data.overview.totalSubscriptions,
           activeSubscriptions: newsletterData.data.overview.activeSubscriptions,
           recentSubscriptions: newsletterData.data.overview.recentSubscriptions
         } : undefined,
-        recentActivity: [
-          {
-            id: '1',
-            type: 'news',
-            title: 'New workshop announced',
-            timestamp: new Date().toISOString(),
-            user: 'Admin User'
-          },
-          {
-            id: '2',
-            type: 'user',
-            title: 'New user registered',
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            user: 'System'
-          }
-        ]
+        recentActivity: [] // Will be populated from actual activity data
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      // Set mock data if API fails
+      // Set empty stats if API fails
       setStats({
-        totalUsers: 25,
-        totalNews: 12,
-        totalEvents: 5,
-        totalWorkshops: 3,
-        recentActivity: [
-          {
-            id: '1',
-            type: 'news',
-            title: 'New workshop announced',
-            timestamp: new Date().toISOString(),
-            user: 'Admin User'
-          }
-        ]
+        totalUsers: 0,
+        totalNews: 0,
+        totalEvents: 0,
+        totalWorkshops: 0,
+        recentActivity: []
       });
     }
   };

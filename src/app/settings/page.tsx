@@ -10,20 +10,14 @@ import {
   ShieldCheckIcon,
   GlobeAltIcon,
   CloudIcon,
-  KeyIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  CheckIcon,
-  XMarkIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 interface SettingsSection {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 const settingsSections: SettingsSection[] = [
@@ -332,22 +326,22 @@ export default function SettingsPage() {
     setHasChanges(true);
   };
 
-  const handleSecurityChange = (field: keyof SecuritySettings, value: any) => {
+  const handleSecurityChange = (field: keyof SecuritySettings, value: string | boolean | number) => {
     setSecurity(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
-  const handleGeneralChange = (field: keyof GeneralSettings, value: any) => {
+  const handleGeneralChange = (field: keyof GeneralSettings, value: string | boolean | number) => {
     setGeneral(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
-  const handleIntegrationChange = (field: keyof IntegrationSettings, value: any) => {
+  const handleIntegrationChange = (field: keyof IntegrationSettings, value: string | boolean) => {
     setIntegrations(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
-  const handleSystemChange = (field: keyof SystemSettings, value: any) => {
+  const handleSystemChange = (field: keyof SystemSettings, value: string | boolean | number) => {
     setSystem(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };

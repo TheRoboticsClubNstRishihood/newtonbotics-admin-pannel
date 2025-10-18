@@ -5,7 +5,7 @@ const backendUrl = getBackendUrl();
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; milestoneId: string } }
+  { params }: { params: Promise<{ id: string; milestoneId: string }> }
 ) {
   try {
     const token = request.headers.get('authorization');
@@ -13,7 +13,7 @@ export async function PUT(
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const { id, milestoneId } = params;
+    const { id, milestoneId } = await params;
     const body = await request.json();
     console.log('Updating milestone with data:', body);
 

@@ -9,9 +9,6 @@ import {
   CalendarIcon,
   TagIcon,
   BuildingOfficeIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ClockIcon,
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
@@ -48,7 +45,7 @@ interface ContactDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   submission: ContactSubmission | null;
-  onUpdate: (updatedSubmission: Partial<ContactSubmission>) => void;
+  onUpdate: (updatedSubmission: { status: string; priority: string; response: string; assignedTo?: string }) => void;
 }
 
 const statusOptions = [
@@ -71,7 +68,12 @@ export default function ContactDetailModal({
   onUpdate 
 }: ContactDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<Partial<ContactSubmission>>({});
+  const [formData, setFormData] = useState<{
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    response?: string;
+  }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -92,10 +94,10 @@ export default function ContactDetailModal({
     setIsSubmitting(true);
     try {
       // Prepare the update data according to API spec
-      const updateData: any = {
-        status: formData.status,
-        priority: formData.priority,
-        response: formData.response
+      const updateData: { status: string; priority: string; response: string; assignedTo?: string } = {
+        status: formData.status || submission.status,
+        priority: formData.priority || submission.priority,
+        response: formData.response || ''
       };
 
       // Only include assignedTo if it's a string ID
@@ -284,7 +286,7 @@ export default function ContactDetailModal({
                     </label>
                     <select
                       value={formData.status || ''}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {statusOptions.map(option => (
@@ -301,7 +303,7 @@ export default function ContactDetailModal({
                     </label>
                     <select
                       value={formData.priority || ''}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {priorityOptions.map(option => (
@@ -318,7 +320,7 @@ export default function ContactDetailModal({
                     </label>
                     <input
                       type="text"
-                      value={typeof formData.assignedTo === 'string' ? formData.assignedTo : ''}
+                      value={formData.assignedTo || ''}
                       onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       placeholder="Enter user ID (e.g., 64f8a1b2c3d4e5f6a7b8c9d0)"

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // Get the authorization header from the request
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
@@ -17,7 +18,7 @@ export async function DELETE(
     // Make request to your backend API
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     
-    const response = await fetch(`${backendUrl}/api/inventory/categories/${params.id}`, {
+    const response = await fetch(`${backendUrl}/api/inventory/categories/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': authHeader,

@@ -1,23 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { 
   ArrowLeftIcon,
-  UserIcon,
-  CalendarIcon,
   CurrencyDollarIcon,
-  TagIcon,
   PhotoIcon,
   VideoCameraIcon,
   CodeBracketIcon,
   DocumentTextIcon,
-  TrophyIcon,
   HashtagIcon,
   PlusIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
+import CloudinaryUploader from '@/components/CloudinaryUploader';
 
 interface User {
   id: string;
@@ -122,30 +119,33 @@ export default function EditProjectPage() {
       });
 
       const data = await response.json();
+      console.log('EditProjectPage: fetched project response', data);
       if (data.success) {
-        const projectData = data.data;
-        setProject(projectData);
+        // Normalize possible shapes: {data: {project: {...}}} or {data: {...}} or {project: {...}}
+        const raw = (data?.data && (data.data.project || data.data)) || data.project || data.item || {};
+        console.log('EditProjectPage: normalized projectData', raw);
+        setProject(raw);
         setFormData({
-          title: projectData.title || '',
-          description: projectData.description || '',
-          category: projectData.category || '',
-          status: projectData.status || 'upcoming',
-          startDate: projectData.startDate ? projectData.startDate.split('T')[0] : '',
-          endDate: projectData.endDate ? projectData.endDate.split('T')[0] : '',
-          budget: projectData.budget ? projectData.budget.toString() : '',
-          mentorId: projectData.mentorId || '',
-          teamLeaderId: projectData.teamLeaderId || '',
-          imageUrl: projectData.imageUrl || '',
-          videoUrl: projectData.videoUrl || '',
-          githubUrl: projectData.githubUrl || '',
-          documentationUrl: projectData.documentationUrl || '',
-          achievements: projectData.achievements ? projectData.achievements.join('\n') : '',
-          tags: projectData.tags ? projectData.tags.join(', ') : '',
-          priority: projectData.priority || 'medium',
-          difficulty: projectData.difficulty || 'intermediate',
-          estimatedHours: projectData.estimatedHours ? projectData.estimatedHours.toString() : '',
-          isPublic: projectData.isPublic !== undefined ? projectData.isPublic : true,
-          isFeatured: projectData.isFeatured || false
+          title: raw.title ?? '',
+          description: raw.description ?? '',
+          category: raw.category ?? '',
+          status: raw.status ?? 'upcoming',
+          startDate: raw.startDate ? String(raw.startDate).split('T')[0] : '',
+          endDate: raw.endDate ? String(raw.endDate).split('T')[0] : '',
+          budget: raw.budget != null ? String(raw.budget) : '',
+          mentorId: typeof (raw as any).mentorId === 'string' ? (raw as any).mentorId : (raw as any).mentorId?.id || (raw as any).mentor?.id || '',
+          teamLeaderId: typeof (raw as any).teamLeaderId === 'string' ? (raw as any).teamLeaderId : (raw as any).teamLeaderId?.id || (raw as any).teamLeader?.id || '',
+          imageUrl: raw.imageUrl ?? '',
+          videoUrl: raw.videoUrl ?? '',
+          githubUrl: raw.githubUrl ?? '',
+          documentationUrl: raw.documentationUrl ?? '',
+          achievements: Array.isArray(raw.achievements) ? raw.achievements.join('\n') : '',
+          tags: Array.isArray(raw.tags) ? raw.tags.join(', ') : '',
+          priority: raw.priority ?? 'medium',
+          difficulty: raw.difficulty ?? 'intermediate',
+          estimatedHours: raw.estimatedHours != null ? String(raw.estimatedHours) : '',
+          isPublic: raw.isPublic !== undefined ? raw.isPublic : true,
+          isFeatured: Boolean(raw.isFeatured)
         });
       } else {
         alert(data.message || 'Failed to fetch project details');
@@ -201,9 +201,11 @@ export default function EditProjectPage() {
         ...formData,
         budget: formData.budget ? parseFloat(formData.budget) : undefined,
         estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
-        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : undefined,
-        achievements: formData.achievements ? formData.achievements.split('\n').filter(a => a.trim()) : undefined
+        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : undefined,
+        achievements: formData.achievements ? formData.achievements.split('\n').map(a => a.trim()).filter(Boolean) : undefined
       };
+      // Ensure only valid keys are sent
+      Object.keys(projectData).forEach((k) => (projectData as any)[k] === '' || (projectData as any)[k] === undefined ? delete (projectData as any)[k] : null);
 
       // Update the project first
       const response = await fetch(`/api/projects/${params.id}`, {
@@ -245,7 +247,15 @@ export default function EditProjectPage() {
             });
 
             if (!memberResponse.ok) {
-              console.error('Failed to add team member:', member.userId);
+              let errMsg = '';
+              try {
+                const errJson = await memberResponse.json();
+                errMsg = errJson.message || errJson.error?.message || JSON.stringify(errJson);
+              } catch {
+                try { errMsg = await memberResponse.text(); } catch {}
+              }
+              console.error('Failed to add team member:', member.userId, errMsg);
+              alert(errMsg || 'Failed to add team member');
             }
           }
         }
@@ -685,16 +695,28 @@ export default function EditProjectPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Project Image URL
                 </label>
-                <div className="relative">
-                  <PhotoIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="url"
-                    name="imageUrl"
-                    value={formData.imageUrl}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="https://example.com/image.jpg"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                  <div className="relative">
+                    <PhotoIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="url"
+                      name="imageUrl"
+                      value={formData.imageUrl}
+                      onChange={handleInputChange}
+                      className="w-full pl-10 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="https://example.com/image.jpg"
+                    />
+                  </div>
+                  <div>
+                    <CloudinaryUploader
+                      label={formData.imageUrl ? 'Replace Image' : 'Upload Image'}
+                      folder="newtonbotics/projects/images"
+                      resourceType="image"
+                      onUploadComplete={(res) => setFormData(prev => ({ ...prev, imageUrl: res.secureUrl || res.url }))}
+                      showPreview={false}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">You can paste a URL or upload an image.</p>
+                  </div>
                 </div>
               </div>
 

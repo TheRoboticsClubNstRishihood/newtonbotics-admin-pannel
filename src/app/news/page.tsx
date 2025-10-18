@@ -10,12 +10,9 @@ import {
   TagIcon,
   ArrowPathIcon,
   PencilIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   DocumentTextIcon,
   CalendarIcon,
-  UserIcon,
-  EyeIcon as EyeIconSolid
+  UserIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
 import { useToast } from '../../components/ToastContext';
@@ -166,102 +163,41 @@ export default function News() {
       ]);
 
       if (articlesResponse.ok && categoriesResponse.ok) {
-        const articlesData = await articlesResponse.json();
-        const categoriesData = await categoriesResponse.json();
-        
+        const [articlesData, categoriesData] = await Promise.all([
+          articlesResponse.json(),
+          categoriesResponse.json()
+        ]);
+
         console.log('Articles data:', articlesData);
         console.log('Categories data:', categoriesData);
-        
-        setArticles(articlesData.data.items || []);
-        setCategories(categoriesData.data.categories || []);
+
+        const normalizedArticles =
+          (articlesData && articlesData.data && Array.isArray(articlesData.data.items) && articlesData.data.items) ||
+          (articlesData && articlesData.data && Array.isArray(articlesData.data.articles) && articlesData.data.articles) ||
+          (articlesData && articlesData.data && Array.isArray(articlesData.data.news) && articlesData.data.news) ||
+          (Array.isArray(articlesData.items) && articlesData.items) ||
+          (Array.isArray(articlesData.articles) && articlesData.articles) ||
+          (Array.isArray(articlesData.news) && articlesData.news) ||
+          (Array.isArray(articlesData.data) && articlesData.data) ||
+          (Array.isArray(articlesData) ? articlesData : []);
+
+        const normalizedCategories =
+          (categoriesData && categoriesData.data && Array.isArray(categoriesData.data.categories) && categoriesData.data.categories) ||
+          (Array.isArray(categoriesData.categories) && categoriesData.categories) ||
+          (Array.isArray(categoriesData.data) && categoriesData.data) ||
+          (Array.isArray(categoriesData) ? categoriesData : []);
+
+        setArticles(normalizedArticles || []);
+        setCategories(normalizedCategories || []);
       } else {
         console.log('Backend responses:', {
           articles: articlesResponse.status,
           categories: categoriesResponse.status
         });
-        // Show mock data for testing
-        const mockArticles = [
-          {
-            _id: '1',
-            id: '1',
-            title: 'NewtonBotics Wins Regional Robotics Competition',
-            content: 'Our team has achieved remarkable success in the regional robotics competition...',
-            authorId: {
-              _id: '1',
-              id: '1',
-              firstName: 'Admin',
-              lastName: 'User'
-            },
-            categoryId: {
-              _id: '1',
-              id: '1',
-              name: 'Achievements',
-              description: 'Team achievements and awards'
-            },
-            isPublished: true,
-            isFeatured: true,
-            featureOptions: {
-              showInNav: true,
-              navOrder: 1,
-              featuredImage: 'https://example.com/featured-image.jpg'
-            },
-            publishedAt: '2023-09-05T10:00:00.000Z',
-            viewCount: 150,
-            tags: ['competition', 'robotics', 'achievement'],
-            createdAt: '2023-09-05T08:00:00.000Z',
-            updatedAt: '2023-09-05T10:00:00.000Z'
-          },
-          {
-            _id: '2',
-            id: '2',
-            title: 'New Workshop Series: Introduction to AI and Machine Learning',
-            content: 'We are excited to announce our new workshop series focused on AI and Machine Learning fundamentals...',
-            authorId: {
-              _id: '1',
-              id: '1',
-              firstName: 'Admin',
-              lastName: 'User'
-            },
-            categoryId: {
-              _id: '2',
-              id: '2',
-              name: 'Workshops',
-              description: 'Workshop announcements and updates'
-            },
-            isPublished: false,
-            isFeatured: false,
-            featureOptions: {
-              showInNav: false,
-              navOrder: 0,
-              featuredImage: ''
-            },
-            viewCount: 0,
-            tags: ['workshop', 'ai', 'machine learning'],
-            createdAt: '2023-09-05T12:00:00.000Z',
-            updatedAt: '2023-09-05T12:00:00.000Z'
-          }
-        ];
-
-        const mockCategories = [
-          {
-            _id: '1',
-            id: '1',
-            name: 'Achievements',
-            description: 'Team achievements and awards',
-            createdAt: '2023-09-01T08:00:00.000Z'
-          },
-          {
-            _id: '2',
-            id: '2',
-            name: 'Workshops',
-            description: 'Workshop announcements and updates',
-            createdAt: '2023-09-01T08:00:00.000Z'
-          }
-        ];
-
-        setArticles(mockArticles);
-        setCategories(mockCategories);
-        showError(`Backend endpoints not ready (Articles: ${articlesResponse.status}, Categories: ${categoriesResponse.status}). Showing mock data for testing.`);
+        // No data available
+        setArticles([]);
+        setCategories([]);
+        showError(`Unable to fetch news data (Articles: ${articlesResponse.status}, Categories: ${categoriesResponse.status}). Please try again later.`);
       }
     } catch (error) {
       console.error('Error fetching news data:', error);

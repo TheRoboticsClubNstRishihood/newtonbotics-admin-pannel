@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { 
   PlusIcon, 
@@ -84,6 +85,14 @@ export default function ProjectsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Statistics state
+  const [statistics, setStatistics] = useState({
+    total: 0,
+    ongoing: 0,
+    completed: 0,
+    onHold: 0
+  });
 
   const fetchProjects = async () => {
     try {
@@ -129,8 +138,64 @@ export default function ProjectsPage() {
     }
   };
 
+  const fetchStatistics = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      // Build query params for statistics (apply current filters)
+      const queryParams = new URLSearchParams();
+      if (filters.search) queryParams.append('q', filters.search);
+      if (filters.category) queryParams.append('category', filters.category);
+      if (filters.mentorId) queryParams.append('mentorId', filters.mentorId);
+      if (filters.teamLeaderId) queryParams.append('teamLeaderId', filters.teamLeaderId);
+      // Don't set limit - let backend use default
+
+      const response = await fetch(`/api/projects?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const allProjects = data.data.projects || [];
+        const stats = {
+          total: allProjects.length,
+          ongoing: allProjects.filter((p: Project) => p.status === 'ongoing').length,
+          completed: allProjects.filter((p: Project) => p.status === 'completed').length,
+          onHold: allProjects.filter((p: Project) => p.status === 'on_hold').length
+        };
+        setStatistics(stats);
+      } else {
+        console.error('Failed to fetch statistics:', data);
+        // Fallback: calculate from current projects
+        const stats = {
+          total: projects.length,
+          ongoing: projects.filter((p: Project) => p.status === 'ongoing').length,
+          completed: projects.filter((p: Project) => p.status === 'completed').length,
+          onHold: projects.filter((p: Project) => p.status === 'on_hold').length
+        };
+        setStatistics(stats);
+      }
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+      // Fallback: calculate from current projects
+      const stats = {
+        total: projects.length,
+        ongoing: projects.filter((p: Project) => p.status === 'ongoing').length,
+        completed: projects.filter((p: Project) => p.status === 'completed').length,
+        onHold: projects.filter((p: Project) => p.status === 'on_hold').length
+      };
+      setStatistics(stats);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchStatistics();
   }, [currentPage, filters]);
 
   const handleFilterChange = (key: keyof ProjectFilters, value: string) => {
@@ -221,13 +286,13 @@ export default function ProjectsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
             <p className="text-gray-600">Manage and track all projects</p>
           </div>
-          <a 
+          <Link 
             href="/projects/create"
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center space-x-2"
           >
             <PlusIcon className="w-5 h-5" />
             <span>Create Project</span>
-          </a>
+          </Link>
         </div>
 
         {/* Stats */}
@@ -239,7 +304,7 @@ export default function ProjectsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.total}</p>
               </div>
             </div>
           </div>
@@ -250,9 +315,7 @@ export default function ProjectsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Ongoing</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'ongoing').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.ongoing}</p>
               </div>
             </div>
           </div>
@@ -263,9 +326,7 @@ export default function ProjectsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'completed').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.completed}</p>
               </div>
             </div>
           </div>
@@ -276,9 +337,7 @@ export default function ProjectsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">On Hold</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'on_hold').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.onHold}</p>
               </div>
             </div>
           </div>

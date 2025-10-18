@@ -114,7 +114,7 @@ export default function RoleApprovalModal({
     }));
   };
 
-  const handleInputChange = (field: keyof RoleApproval, value: any) => {
+  const handleInputChange = (field: keyof RoleApproval, value: string | boolean | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));

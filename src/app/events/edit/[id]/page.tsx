@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../../components/AdminLayout';
@@ -31,7 +31,14 @@ interface Event {
     navLabel?: string;
     navOrder: number;
   };
-  registrations: any[];
+  registrations: Array<{
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    registeredAt: string;
+    status: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +51,7 @@ interface EventFormData {
   location: string;
   maxCapacity: number;
   organizerId: string;
-  category: string;
+  category?: string;
   type: string;
   isFeatured: boolean;
   imageUrl?: string;
@@ -52,9 +59,9 @@ interface EventFormData {
   registrationDeadline?: string;
   registrationFormLink?: string;
   featureOptions?: {
-    showInNav: boolean;
+    showInNav?: boolean;
     navLabel?: string;
-    navOrder: number;
+    navOrder?: number;
   };
 }
 
@@ -100,8 +107,9 @@ export default function EditEventPage() {
     if (params.id && params.id !== 'undefined') {
       // Validate MongoDB ObjectId format
       const objectIdRegex = /^[0-9a-fA-F]{24}$/;
-      if (!objectIdRegex.test(params.id)) {
-        console.error('Invalid event ID format:', params.id);
+      const idString = Array.isArray(params.id) ? params.id[0] : params.id;
+      if (!objectIdRegex.test(idString)) {
+        console.error('Invalid event ID format:', idString);
         showError('Invalid event ID format');
         router.push('/events');
         return;
@@ -155,6 +163,15 @@ export default function EditEventPage() {
           }
         });
       } else {
+        if (response.status === 401) {
+          // Token expired or invalid: clear auth and redirect to login for security
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          showError('Your session expired for security reasons. Please log in again.');
+          router.push('/');
+          return;
+        }
         const errorData = await response.json().catch(() => ({}));
         console.error('Backend error response:', errorData);
         showError(`Failed to fetch event: ${errorData.error?.message || errorData.message || `HTTP ${response.status}`}`);
@@ -213,8 +230,12 @@ export default function EditEventPage() {
       return;
     }
     
-    if (new Date(formData.startDate) >= new Date(formData.endDate)) {
-      showError('End date must be after start date');
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      console.warn('Edit Event validation failed: end date is before start date', {
+        startDate: formData.startDate,
+        endDate: formData.endDate
+      });
+      showError('End date cannot be before start date');
       return;
     }
     
@@ -245,7 +266,7 @@ export default function EditEventPage() {
         return;
       }
       
-      if (formData.featureOptions.navOrder < 0) {
+      if (formData.featureOptions.navOrder !== undefined && formData.featureOptions.navOrder < 0) {
         showError('Navigation order must be 0 or greater');
         return;
       }
@@ -274,12 +295,40 @@ export default function EditEventPage() {
       const user = userData ? JSON.parse(userData) : null;
       
       // Prepare the request data with organizerId and proper date formatting
-      const requestData = {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      const isSameDay = start.toDateString() === end.toDateString();
+      if (isSameDay) {
+        console.info('Edit Event: same-day detected, normalizing end time to end-of-day');
+        end.setHours(23, 59, 59, 999);
+      }
+      const requestData: any = {
         ...formData,
         organizerId: user?.id || '68a30681af3f3b7d9e2653a3', // Use user ID or fallback
-        startDate: new Date(formData.startDate).toISOString(),
-        endDate: new Date(formData.endDate).toISOString()
+        startDate: start.toISOString(),
+        endDate: end.toISOString()
       };
+
+      // Normalize registrationDeadline to ISO8601 only if provided and registration is required
+      if (formData.requiresRegistration) {
+        if (formData.registrationDeadline) {
+          try {
+            const regDeadlineIso = new Date(formData.registrationDeadline).toISOString();
+            requestData.registrationDeadline = regDeadlineIso;
+            console.info('Edit Event: normalized registrationDeadline to ISO8601');
+          } catch {
+            delete requestData.registrationDeadline;
+          }
+        } else {
+          delete requestData.registrationDeadline;
+        }
+        if (!formData.registrationFormLink || formData.registrationFormLink.trim() === '') {
+          delete requestData.registrationFormLink;
+        }
+      } else {
+        delete requestData.registrationDeadline;
+        delete requestData.registrationFormLink;
+      }
       
       const eventId = params.id;
       console.log('Updating event with ID:', eventId);
@@ -298,6 +347,15 @@ export default function EditEventPage() {
         showSuccess('Event updated successfully!');
         router.push('/events');
       } else {
+        if (response.status === 401) {
+          // Token expired or invalid: clear auth and redirect to login for security
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          showError('Your session expired for security reasons. Please log in again.');
+          router.push('/');
+          return;
+        }
         const errorData = await response.json().catch(() => ({}));
         console.error('Error response:', errorData);
         
@@ -310,14 +368,12 @@ export default function EditEventPage() {
           errorMessage = errorData.error.message;
         } else if (errorData.error?.details?.errors && Array.isArray(errorData.error.details.errors)) {
           // Handle validation errors array
-          const validationErrors = errorData.error.details.errors.map((err: any) => err.message).join(', ');
+          const validationErrors = errorData.error.details.errors.map((err: { message: string }) => err.message).join(', ');
           errorMessage = validationErrors;
         } else if (errorData.error?.details?.message) {
           errorMessage = errorData.error.details.message;
         } else if (response.status === 400) {
           errorMessage = 'Invalid data provided. Please check all fields and try again.';
-        } else if (response.status === 401) {
-          errorMessage = 'Authentication failed. Please log in again.';
         } else if (response.status === 403) {
           errorMessage = 'You do not have permission to update events.';
         } else if (response.status === 404) {

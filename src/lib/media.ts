@@ -8,7 +8,7 @@ async function safeParseJson(response: Response) {
   throw new Error(`Unexpected response (${response.status} ${response.statusText}): ${text.slice(0, 200)}`);
 }
 
-function toQuery(params: Record<string, any> = {}) {
+function toQuery(params: Record<string, string | number | boolean | null | undefined> = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null || v === '') return;

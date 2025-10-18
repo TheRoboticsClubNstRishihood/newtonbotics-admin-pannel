@@ -1,22 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
   EyeIcon,
   TrashIcon,
   ChatBubbleLeftRightIcon,
-  ChartBarIcon,
   ArrowPathIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  EllipsisVerticalIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
-  XCircleIcon,
-  PaperAirplaneIcon
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import ContactDetailModal from '../../components/ContactDetailModal';
 import AdminLayout from '../../components/AdminLayout';
@@ -136,16 +133,7 @@ export default function Contact() {
     { value: 'Equipment', label: 'Equipment' }
   ];
 
-  useEffect(() => {
-    fetchSubmissions();
-    fetchStatistics();
-  }, []);
-
-  useEffect(() => {
-    fetchSubmissions();
-  }, [pagination.page, searchQuery, selectedStatus, selectedPriority, selectedDepartment, selectedCategory]);
-
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
@@ -192,9 +180,9 @@ export default function Contact() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchQuery, selectedStatus, selectedPriority, selectedDepartment, selectedCategory]);
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async () => {
     setIsLoadingStats(true);
     try {
       const token = localStorage.getItem('accessToken');
@@ -225,9 +213,18 @@ export default function Contact() {
     } finally {
       setIsLoadingStats(false);
     }
-  };
+  }, []);
 
-  const handleUpdateSubmission = async (updatedData: Partial<ContactSubmission>) => {
+  useEffect(() => {
+    fetchSubmissions();
+    fetchStatistics();
+  }, [fetchSubmissions, fetchStatistics]);
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, [fetchSubmissions, pagination.page, searchQuery, selectedStatus, selectedPriority, selectedDepartment, selectedCategory]);
+
+  const handleUpdateSubmission = async (updatedData: { status: string; priority: string; response: string; assignedTo?: string }) => {
     if (!selectedSubmission) return;
 
     try {

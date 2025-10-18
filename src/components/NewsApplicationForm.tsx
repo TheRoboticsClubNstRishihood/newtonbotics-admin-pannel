@@ -19,7 +19,7 @@ interface ApplicationFormProps {
   deadline?: string;
   maxApplicants?: number;
   formFields: ApplicationFormField[];
-  onSubmit?: (formData: any) => Promise<void>;
+  onSubmit?: (formData: Record<string, string | number | boolean>) => Promise<void>;
   isLoggedIn?: boolean;
 }
 
@@ -34,7 +34,7 @@ export default function NewsApplicationForm({
   onSubmit,
   isLoggedIn = false
 }: ApplicationFormProps) {
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, string | number | boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -135,7 +135,7 @@ export default function NewsApplicationForm({
   };
 
   const renderField = (field: ApplicationFormField) => {
-    const value = formData[field.name] || '';
+    const value = String(formData[field.name] || '');
     const required = field.required;
 
     switch (field.type) {
@@ -176,7 +176,7 @@ export default function NewsApplicationForm({
             <input
               type="checkbox"
               name={field.name}
-              checked={value}
+              checked={Boolean(formData[field.name])}
               onChange={(e) => setFormData(prev => ({ ...prev, [field.name]: e.target.checked }))}
               required={required}
               className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
@@ -250,7 +250,7 @@ export default function NewsApplicationForm({
                 Application Submitted!
               </h3>
               <p className="text-sm text-green-700 mt-1">
-                Thank you for your application. We'll get back to you soon.
+                Thank you for your application. We&apos;ll get back to you soon.
               </p>
             </div>
           </div>

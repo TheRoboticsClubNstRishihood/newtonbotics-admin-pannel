@@ -6,7 +6,6 @@ import {
   ChartBarIcon, 
   ClockIcon, 
   CalendarIcon,
-  ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 
@@ -99,7 +98,7 @@ export default function TeamAnalytics({ allTeamMembers }: TeamAnalyticsProps) {
           <h3 className="text-lg font-medium text-gray-900">Team Analytics</h3>
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as any)}
+            onChange={(e) => setTimeRange(e.target.value as 'all' | 'month' | 'quarter' | 'year')}
             className="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="all">All Time</option>
@@ -243,4 +242,6 @@ export default function TeamAnalytics({ allTeamMembers }: TeamAnalyticsProps) {
     </div>
   );
 }
+
+
 

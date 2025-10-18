@@ -11,30 +11,56 @@ import {
   CalendarIcon,
   TagIcon,
   ChartBarIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  CurrencyDollarIcon,
+  UserIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  CalendarDaysIcon,
+  UsersIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
+interface TeamMember {
+  userId: string;
+  proposedRole: string;
+  skills: string[];
+  availabilityHoursPerWeek: number;
+}
+
+interface Resource {
+  resourceType: 'equipment' | 'software' | 'funding' | 'space' | 'other';
+  description: string;
+  estimatedCost: number;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+}
+
 interface ProjectRequest {
-  id: string;
+  _id: string;
   title: string;
   description: string;
-  status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'on_hold';
-  category?: string;
-  budget?: number;
-  expectedDuration?: string;
+  objectives: string[];
+  expectedOutcomes: string[];
+  teamSize: number;
+  estimatedDurationMonths: number;
+  budgetEstimate: number;
+  requiredResources: string[];
   mentorId?: string;
-  submittedBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  mentor?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
+  status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'on_hold';
+  submittedBy: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNotes?: string;
+  approvalDate?: string;
+  startDate?: string;
+  endDate?: string;
+  teamMembers: TeamMember[];
+  resources: Resource[];
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +70,15 @@ interface ProjectRequestFilters {
   status: string;
   mentorId: string;
   submittedBy: string;
+}
+
+interface ProjectRequestStats {
+  total: number;
+  pending: number;
+  underReview: number;
+  approved: number;
+  rejected: number;
+  onHold: number;
 }
 
 export default function ProjectRequestsPage() {
@@ -60,6 +95,16 @@ export default function ProjectRequestsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState<ProjectRequestStats>({
+    total: 0,
+    pending: 0,
+    underReview: 0,
+    approved: 0,
+    rejected: 0,
+    onHold: 0
+  });
+  const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
 
   const fetchProjectRequests = async () => {
     try {
@@ -71,7 +116,7 @@ export default function ProjectRequestsPage() {
       }
 
       const queryParams = new URLSearchParams();
-      if (filters.search) queryParams.append('q', filters.search);
+      if (filters.search) queryParams.append('search', filters.search);
       if (filters.status) queryParams.append('status', filters.status);
       if (filters.mentorId) queryParams.append('mentorId', filters.mentorId);
       if (filters.submittedBy) queryParams.append('submittedBy', filters.submittedBy);
@@ -88,9 +133,24 @@ export default function ProjectRequestsPage() {
       const data = await response.json();
 
       if (data.success) {
-        setProjectRequests(data.data.projectRequests || []);
-        setTotalCount(data.data.totalCount || 0);
-        setTotalPages(Math.ceil((data.data.totalCount || 0) / 20));
+        const items = data.data.items || [];
+        setProjectRequests(items);
+        
+        // Calculate pagination
+        const pagination = data.data.pagination || {};
+        setTotalCount(pagination.total || 0);
+        setTotalPages(Math.ceil((pagination.total || 0) / 20));
+        
+        // Calculate stats
+        const newStats = {
+          total: pagination.total || 0,
+          pending: items.filter((r: ProjectRequest) => r.status === 'pending').length,
+          underReview: items.filter((r: ProjectRequest) => r.status === 'under_review').length,
+          approved: items.filter((r: ProjectRequest) => r.status === 'approved').length,
+          rejected: items.filter((r: ProjectRequest) => r.status === 'rejected').length,
+          onHold: items.filter((r: ProjectRequest) => r.status === 'on_hold').length
+        };
+        setStats(newStats);
       } else {
         setError(data.message || 'Failed to fetch project requests');
       }
@@ -127,7 +187,9 @@ export default function ProjectRequestsPage() {
       const data = await response.json();
 
       if (data.success) {
-        setProjectRequests(prev => prev.filter(r => r.id !== requestId));
+        setProjectRequests(prev => prev.filter(r => r._id !== requestId));
+        setSelectedRequests(prev => prev.filter(id => id !== requestId));
+        fetchProjectRequests(); // Refresh to update stats
       } else {
         alert(data.message || 'Failed to delete project request');
       }
@@ -137,7 +199,176 @@ export default function ProjectRequestsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`/api/project-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchProjectRequests(); // Refresh to update status
+        alert('Project request approved successfully');
+      } else {
+        alert(data.message || 'Failed to approve project request');
+      }
+    } catch (err) {
+      console.error('Error approving project request:', err);
+      alert('Failed to approve project request');
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string, reason: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`/api/project-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        fetchProjectRequests(); // Refresh to update status
+        alert('Project request rejected');
+      } else {
+        alert(data.message || 'Failed to reject project request');
+      }
+    } catch (err) {
+      console.error('Error rejecting project request:', err);
+      alert('Failed to reject project request');
+    }
+  };
+
+  const handleUpdateStatus = async (requestId: string, status: string, reviewNotes?: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      console.log('Updating status to:', status, 'for request:', requestId);
+      
+      const response = await fetch(`/api/project-requests/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          status,
+          reviewNotes: reviewNotes || undefined
+        })
+      });
+
+      console.log('Status update response:', response.status);
+      const data = await response.json();
+      console.log('Status update data:', data);
+
+      if (data.success) {
+        fetchProjectRequests(); // Refresh to update status
+        alert(`Status updated to ${status} successfully`);
+      } else {
+        console.error('Status update failed:', data);
+        alert(data.message || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert('Failed to update status');
+    }
+  };
+
+  const handleSelectRequest = (requestId: string) => {
+    setSelectedRequests(prev => 
+      prev.includes(requestId) 
+        ? prev.filter(id => id !== requestId)
+        : [...prev, requestId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRequests.length === projectRequests.length) {
+      setSelectedRequests([]);
+    } else {
+      setSelectedRequests(projectRequests.map(r => r._id));
+    }
+  };
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedRequests.length === 0) {
+      alert('Please select at least one project request');
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to ${action} ${selectedRequests.length} project request(s)?`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      
+      for (const requestId of selectedRequests) {
+        let url = `/api/project-requests/${requestId}`;
+        let method = 'PUT';
+        let body: any = {};
+
+        switch (action) {
+          case 'approve':
+            url = `/api/project-requests/${requestId}/approve`;
+            method = 'POST';
+            body = {};
+            break;
+          case 'reject':
+            url = `/api/project-requests/${requestId}/reject`;
+            method = 'POST';
+            body = { reason: 'Bulk rejection' };
+            break;
+          case 'under_review':
+            body = { status: 'under_review' };
+            break;
+          case 'on_hold':
+            body = { status: 'on_hold' };
+            break;
+          case 'pending':
+            body = { status: 'pending' };
+            break;
+          case 'delete':
+            method = 'DELETE';
+            body = {};
+            break;
+        }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`Failed to ${action} request ${requestId}:`, errorData.message);
+        }
+      }
+
+      setSelectedRequests([]);
+      fetchProjectRequests(); // Refresh to update status
+      alert(`Bulk ${action} completed`);
+    } catch (err) {
+      console.error(`Error performing bulk ${action}:`, err);
+      alert(`Failed to perform bulk ${action}`);
+    }
+  };
+
+  const getStatusColor = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'under_review': return 'bg-blue-100 text-blue-800';
@@ -175,10 +406,19 @@ export default function ProjectRequestsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Project Requests</h1>
             <p className="text-gray-600">Review and manage project requests</p>
           </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={fetchProjectRequests}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center space-x-2"
+            >
+              <ArrowPathIcon className="w-5 h-5" />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -186,59 +426,62 @@ export default function ProjectRequestsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Requests</p>
-                <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
             </div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-yellow-100 rounded-lg">
-                <ChartBarIcon className="w-6 h-6 text-yellow-600" />
+                <ClockIcon className="w-6 h-6 text-yellow-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projectRequests.filter(r => r.status === 'pending').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
               </div>
             </div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <ChartBarIcon className="w-6 h-6 text-blue-600" />
+                <ExclamationTriangleIcon className="w-6 h-6 text-blue-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Under Review</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projectRequests.filter(r => r.status === 'under_review').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{stats.underReview}</p>
               </div>
             </div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-green-100 rounded-lg">
-                <ChartBarIcon className="w-6 h-6 text-green-600" />
+                <CheckCircleIcon className="w-6 h-6 text-green-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Approved</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projectRequests.filter(r => r.status === 'approved').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
               </div>
             </div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-red-100 rounded-lg">
-                <ChartBarIcon className="w-6 h-6 text-red-600" />
+                <XCircleIcon className="w-6 h-6 text-red-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Rejected</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projectRequests.filter(r => r.status === 'rejected').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Cog6ToothIcon className="w-6 h-6 text-gray-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">On Hold</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.onHold}</p>
               </div>
             </div>
           </div>
@@ -314,6 +557,69 @@ export default function ProjectRequestsPage() {
           )}
         </div>
 
+        {/* Bulk Actions */}
+        {selectedRequests.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedRequests.length} request(s) selected
+                </span>
+                <button
+                  onClick={() => setSelectedRequests([])}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleBulkAction('approve')}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center space-x-1"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  <span>Approve</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction('reject')}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 flex items-center space-x-1"
+                >
+                  <XCircleIcon className="w-4 h-4" />
+                  <span>Reject</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction('under_review')}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
+                >
+                  <ExclamationTriangleIcon className="w-4 h-4" />
+                  <span>Under Review</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction('on_hold')}
+                  className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 flex items-center space-x-1"
+                >
+                  <Cog6ToothIcon className="w-4 h-4" />
+                  <span>On Hold</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction('pending')}
+                  className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700 flex items-center space-x-1"
+                >
+                  <ClockIcon className="w-4 h-4" />
+                  <span>Reset to Pending</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction('delete')}
+                  className="bg-red-800 text-white px-3 py-1 rounded text-sm hover:bg-red-900 flex items-center space-x-1"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Project Requests Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
@@ -321,22 +627,27 @@ export default function ProjectRequestsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={selectedRequests.length === projectRequests.length && projectRequests.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Request
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Submitted By
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mentor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Budget
+                    Team Size
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Duration
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Budget
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Submitted
@@ -348,64 +659,131 @@ export default function ProjectRequestsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {projectRequests.map((request) => (
-                  <tr key={request.id} className="hover:bg-gray-50">
+                  <tr key={request._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedRequests.includes(request._id)}
+                        onChange={() => handleSelectRequest(request._id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{request.title}</div>
+                        <div className="text-sm font-medium text-gray-900">{request.title || 'Untitled'}</div>
                         <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {request.description}
+                          {request.description || 'No description'}
                         </div>
-                        {request.category && (
+                        {request.objectives && request.objectives.length > 0 && (
                           <div className="flex items-center mt-1">
-                            <TagIcon className="w-4 h-4 text-gray-400 mr-1" />
-                            <span className="text-xs text-gray-500">{request.category}</span>
+                            <DocumentTextIcon className="w-4 h-4 text-gray-400 mr-1" />
+                            <span className="text-xs text-gray-500">{request.objectives.length} objectives</span>
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
-                        {request.status.replace('_', ' ').toUpperCase()}
+                        {request.status ? request.status.replace('_', ' ').toUpperCase() : 'UNKNOWN'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {request.submittedBy.firstName} {request.submittedBy.lastName}
+                      <div className="flex items-center text-sm text-gray-900">
+                        <UsersIcon className="w-4 h-4 mr-1" />
+                        {request.teamSize || 0} members
                       </div>
-                      <div className="text-sm text-gray-500">{request.submittedBy.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {request.mentor ? (
-                        <div className="text-sm text-gray-900">
-                          {request.mentor.firstName} {request.mentor.lastName}
+                      {request.teamMembers && request.teamMembers.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {request.teamMembers.length} proposed
                         </div>
-                      ) : (
-                        <span className="text-sm text-gray-500">Not assigned</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {request.budget ? `$${request.budget.toLocaleString()}` : 'Not specified'}
+                      <div className="flex items-center">
+                        <CalendarDaysIcon className="w-4 h-4 mr-1" />
+                        {request.estimatedDurationMonths || 0} months
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {request.expectedDuration || 'Not specified'}
+                      <div className="flex items-center">
+                        <CurrencyDollarIcon className="w-4 h-4 mr-1" />
+                        {request.budgetEstimate ? `$${request.budgetEstimate.toLocaleString()}` : 'Not specified'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <CalendarIcon className="w-4 h-4 mr-1" />
-                        {formatDate(request.createdAt)}
+                        {formatDate(request.submittedAt || request.createdAt)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <a 
-                          href={`/project-requests/${request.id}`}
+                          href={`/project-requests/${request._id}`}
                           className="text-indigo-600 hover:text-indigo-900"
+                          title="View Details"
                         >
                           <EyeIcon className="w-5 h-5" />
                         </a>
+                        
+                        {/* Admin Actions - Available for all statuses */}
+                        {request.status !== 'approved' && (
+                          <button 
+                            onClick={() => handleApproveRequest(request._id)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Approve"
+                          >
+                            <CheckCircleIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        
+                        {request.status !== 'rejected' && (
+                          <button 
+                            onClick={() => {
+                              const reason = prompt('Reason for rejection:');
+                              if (reason) handleRejectRequest(request._id, reason);
+                            }}
+                            className="text-red-600 hover:text-red-900"
+                            title="Reject"
+                          >
+                            <XCircleIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        
+                        {request.status !== 'under_review' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(request._id, 'under_review')}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Put Under Review"
+                          >
+                            <ExclamationTriangleIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        
+                        {request.status !== 'on_hold' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(request._id, 'on_hold')}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Put On Hold"
+                          >
+                            <Cog6ToothIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        
+                        {request.status !== 'pending' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(request._id, 'pending')}
+                            className="text-yellow-600 hover:text-yellow-900"
+                            title="Reset to Pending"
+                          >
+                            <ClockIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        
                         <button 
-                          onClick={() => handleDeleteProjectRequest(request.id)}
-                          className="text-red-600 hover:text-red-900"
+                          onClick={() => handleDeleteProjectRequest(request._id)}
+                          className="text-red-800 hover:text-red-900"
+                          title="Delete"
                         >
                           <TrashIcon className="w-5 h-5" />
                         </button>
@@ -489,4 +867,9 @@ export default function ProjectRequestsPage() {
     </AdminLayout>
   );
 }
+
+
+
+
+
 

@@ -48,20 +48,20 @@ export default function CloudinaryUploader({
   const [error, setError] = useState("");
 
   const handleSuccess = useCallback(
-    (result: any) => {
+    (result: { info?: string | { public_id?: string; secure_url?: string; url?: string } } | { public_id?: string; secure_url?: string; url?: string }) => {
       setError("");
-      const info = result?.info || result;
-      if (!info?.public_id) return;
+      const info = 'info' in result ? (typeof result.info === 'string' ? null : result.info) : result;
+      if (!info || !('public_id' in info) || !info.public_id) return;
       
       const payload: CloudinaryResult = {
         publicId: info.public_id,
-        secureUrl: info.secure_url || info.url,
-        url: info.url || info.secure_url,
-        width: info.width,
-        height: info.height,
-        format: info.format,
-        resourceType: info.resource_type,
-        bytes: info.bytes,
+        secureUrl: info.secure_url || info.url || '',
+        url: info.url || info.secure_url || '',
+        width: (info as Record<string, unknown>).width as number | undefined,
+        height: (info as Record<string, unknown>).height as number | undefined,
+        format: (info as Record<string, unknown>).format as string | undefined,
+        resourceType: (info as Record<string, unknown>).resource_type as string | undefined,
+        bytes: (info as Record<string, unknown>).bytes as number | undefined,
       };
       
       setLastResult(payload);
@@ -70,8 +70,16 @@ export default function CloudinaryUploader({
     [onUploadComplete]
   );
 
-  const handleError = useCallback((err: any) => {
-    const message = err?.statusText || err?.message || "Upload failed";
+  const handleError = useCallback((error: string | { statusText?: string; message?: string; error?: { message?: string } } | null) => {
+    // Handle different error types from Cloudinary
+    let message = "Upload failed";
+    
+    if (typeof error === 'string') {
+      message = error;
+    } else if (error && typeof error === 'object') {
+      message = error.statusText || error.message || error.error?.message || message;
+    }
+    
     setError(message);
   }, []);
 
@@ -89,7 +97,6 @@ export default function CloudinaryUploader({
         }}
         uploadPreset={undefined}
         signatureEndpoint="/api/cloudinary/sign"
-        apiKey={CLOUD_API_KEY}
         onUpload={handleSuccess}
         onSuccess={handleSuccess}
         onError={handleError}

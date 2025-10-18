@@ -24,46 +24,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     } else {
       console.error('Backend error:', data);
-      
-      // Return mock data for testing when backend is not available
-      const mockRoles = [
-        'student',
-        'team_member',
-        'mentor',
-        'researcher',
-        'admin',
-        'moderator',
-        'instructor',
-        'coordinator'
-      ];
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          roles: mockRoles
-        }
-      });
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to fetch roles from backend',
+        error: data 
+      }, { status: response.status });
     }
   } catch (error) {
     console.error('Error fetching roles:', error);
-    
-    // Return mock data for testing when network error occurs
-    const mockRoles = [
-      'student',
-      'team_member',
-      'mentor',
-      'researcher',
-      'admin',
-      'moderator',
-      'instructor',
-      'coordinator'
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        roles: mockRoles
-      }
-    });
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Network error while fetching roles',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

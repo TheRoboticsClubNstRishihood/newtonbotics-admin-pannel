@@ -29,12 +29,14 @@ export async function POST(req: Request) {
     const raw = (body && body.paramsToSign) ? body.paramsToSign : body;
 
     // Keep only allowed, defined scalar values
-    const paramsToSign: Record<string, any> = {};
+    const paramsToSign: Record<string, string | number> = {};
     Object.entries(raw || {}).forEach(([k, v]) => {
       if (!ALLOWED_KEYS.has(k)) return;
       if (v === undefined || v === null) return;
       if (typeof v === 'object') return; // ignore nested objects/arrays in signature
-      paramsToSign[k] = v;
+      if (typeof v === 'string' || typeof v === 'number') {
+        paramsToSign[k] = v;
+      }
     });
 
     // Ensure timestamp exists

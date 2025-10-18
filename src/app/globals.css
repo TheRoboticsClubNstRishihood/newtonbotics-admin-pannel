@@ -50,10 +50,127 @@ select option {
   opacity: 1 !important;
 }
 
+/* Ensure all input text is visible and dark */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+textarea,
+select {
+  color: #1f2937 !important; /* dark gray */
+  background-color: #ffffff !important;
+}
 
+/* Ensure input text is visible when focused */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+  color: #111827 !important; /* darker gray */
+  background-color: #ffffff !important;
+}
+
+/* Ensure input text is visible when not focused */
+input[type="text"]:not(:focus),
+input[type="email"]:not(:focus),
+input[type="password"]:not(:focus),
+input[type="search"]:not(:focus),
+input[type="url"]:not(:focus),
+input[type="tel"]:not(:focus),
+input[type="number"]:not(:focus),
+input[type="date"]:not(:focus),
+input[type="datetime-local"]:not(:focus),
+textarea:not(:focus),
+select:not(:focus) {
+  color: #374151 !important; /* medium gray */
+  background-color: #ffffff !important;
+}
+
+/* Newsletter form specific styles */
+.newsletter-form input,
+.newsletter-form textarea,
+.newsletter-form select {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+}
+
+.newsletter-form input::placeholder,
+.newsletter-form textarea::placeholder {
+  color: #6b7280 !important; /* lighter gray for placeholders */
+  opacity: 1 !important;
+}
+
+/* Campaign form specific styles */
+.campaign-form input,
+.campaign-form textarea,
+.campaign-form select {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+}
+
+.campaign-form input::placeholder,
+.campaign-form textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+/* RTE visibility fixes */
+.rte-toolbar button {
+  color: #111827 !important; /* dark */
+}
+.rte-toolbar button:hover { color: #111827 !important; }
+
+.rte-content, .rte-content * {
+  color: #111827 !important;
+}
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Global fix for all input text visibility */
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure all form elements have visible text */
+input, textarea, select {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+}
+
+/* Ensure text is visible when typing */
+input:focus, textarea:focus, select:focus {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Ensure placeholder text is visible but distinguishable */
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+/* Ensure select options are visible */
+select option {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
 }

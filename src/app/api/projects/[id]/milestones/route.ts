@@ -5,7 +5,7 @@ const backendUrl = getBackendUrl();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.headers.get('authorization');
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const url = `${backendUrl}/api/projects/${id}/milestones`;
 
     console.log('Fetching project milestones from:', url);
@@ -46,7 +46,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.headers.get('authorization');
@@ -54,7 +54,7 @@ export async function POST(
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     console.log('Adding milestone with data:', body);
 

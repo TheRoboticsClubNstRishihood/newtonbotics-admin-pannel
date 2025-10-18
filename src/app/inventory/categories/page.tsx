@@ -511,7 +511,7 @@ export default function CategoriesPage() {
               <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Category</h3>
               <div className="mt-2 px-7 py-3">
                 <p className="text-sm text-gray-500">
-                  Are you sure you want to delete "{selectedCategory.name}"? This action cannot be undone.
+                  Are you sure you want to delete &quot;{selectedCategory.name}&quot;? This action cannot be undone.
                 </p>
               </div>
               <div className="flex justify-center space-x-3 mt-4">

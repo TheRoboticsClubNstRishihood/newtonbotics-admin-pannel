@@ -1,19 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  CalendarIcon,
-  AcademicCapIcon,
-  NewspaperIcon,
-  UserGroupIcon,
-  PhotoIcon,
-  UsersIcon,
-  Cog6ToothIcon,
-  DocumentTextIcon,
-  ArrowRightOnRectangleIcon,
-  BellIcon,
-  UserCircleIcon
-} from '@heroicons/react/24/outline';
 import AdminLayout from '../components/AdminLayout';
 
 interface User {
@@ -30,11 +17,6 @@ interface User {
   lastLogin?: string;
 }
 
-interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: string;
-}
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
