@@ -302,7 +302,11 @@ export default function EditEventPage() {
         console.info('Edit Event: same-day detected, normalizing end time to end-of-day');
         end.setHours(23, 59, 59, 999);
       }
-      const requestData: any = {
+      interface FeatureOptions { showInNav?: boolean; navLabel?: string; navOrder?: number }
+      interface UpdatePayload {
+        title?: string; description?: string; startDate?: string; endDate?: string; location?: string; maxCapacity?: number; organizerId?: string; category?: string; type?: string; isFeatured?: boolean; imageUrl?: string; requiresRegistration?: boolean; registrationDeadline?: string; registrationFormLink?: string; featureOptions?: FeatureOptions; [key: string]: unknown;
+      }
+      const requestData: UpdatePayload = {
         ...formData,
         organizerId: user?.id || '68a30681af3f3b7d9e2653a3', // Use user ID or fallback
         startDate: start.toISOString(),

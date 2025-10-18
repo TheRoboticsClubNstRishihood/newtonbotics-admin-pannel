@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 import { useToast } from '../../components/ToastContext';
 import { 
@@ -115,7 +115,7 @@ export default function SettingsPage() {
   const { showSuccess, showError } = useToast();
   const [activeSection, setActiveSection] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  // Removed unused showPassword state
   const [hasChanges, setHasChanges] = useState(false);
 
   // State for different settings sections
@@ -171,12 +171,34 @@ export default function SettingsPage() {
     apiRateLimit: 1000
   });
 
-  useEffect(() => {
-    // Load settings from localStorage or API
-    loadSettings();
-  }, []);
+  const loadServerSettings = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
 
-  const loadSettings = async () => {
+      // Load system settings from API
+      const response = await fetch('/api/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update server-side settings
+        if (data.data) {
+          setSecurity(data.data.security || security);
+          setIntegrations(data.data.integrations || integrations);
+          setSystem(data.data.system || system);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading server settings:', error);
+    }
+  }, [security, integrations, system]);
+
+  const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
       // Load user profile from localStorage
@@ -213,34 +235,12 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showError, loadServerSettings]);
 
-  const loadServerSettings = async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
-
-      // Load system settings from API
-      const response = await fetch('/api/settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Update server-side settings
-        if (data.data) {
-          setSecurity(data.data.security || security);
-          setIntegrations(data.data.integrations || integrations);
-          setSystem(data.data.system || system);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading server settings:', error);
-    }
-  };
+  useEffect(() => {
+    // Load settings from localStorage or API
+    loadSettings();
+  }, [loadSettings]);
 
   const saveSettings = async () => {
     setIsLoading(true);

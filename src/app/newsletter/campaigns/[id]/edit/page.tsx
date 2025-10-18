@@ -44,7 +44,7 @@ interface NewsletterCampaign {
   };
 }
 
-export default function EditCampaignPage({ params }: { params: { id: string } }) {
+export default function EditCampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,17 +69,18 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     checkAuthAndFetchData();
-  }, [params.id]);
+  }, [params]);
 
   const checkAuthAndFetchData = async () => {
     try {
+      const { id } = await params;
       const token = localStorage.getItem('accessToken');
       if (!token) {
         router.push('/');
         return;
       }
 
-      await fetchCampaign();
+      await fetchCampaign(id);
     } catch (error) {
       console.error('Error in checkAuthAndFetchData:', error);
       setError('Failed to load campaign data');
@@ -88,12 +89,12 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
     }
   };
 
-  const fetchCampaign = async () => {
+  const fetchCampaign = async (id: string) => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}`, {
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -211,7 +212,8 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
       console.log('📦 Frontend: Form data:', JSON.stringify(formData, null, 2));
       console.log('🧹 Frontend: Cleaned data:', JSON.stringify(cleanedFormData, null, 2));
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}`, {
+      const { id } = await params;
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -221,7 +223,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
       });
 
       if (response.ok) {
-        router.push(`/newsletter/campaigns/${params.id}`);
+        router.push(`/newsletter/campaigns/${id}`);
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to update campaign');
@@ -273,7 +275,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
       <AdminLayout pageTitle="Campaign Not Found">
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-gray-900">Campaign not found</h2>
-          <p className="mt-2 text-gray-600">The campaign you're trying to edit doesn't exist.</p>
+          <p className="mt-2 text-gray-600">The campaign you&apos;re trying to edit doesn&apos;t exist.</p>
           <button
             onClick={() => router.push('/newsletter/campaigns')}
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
@@ -295,7 +297,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
             Only draft campaigns can be edited. This campaign is currently {campaign.status}.
           </p>
           <button
-            onClick={() => router.push(`/newsletter/campaigns/${params.id}`)}
+            onClick={async () => router.push(`/newsletter/campaigns/${(await params).id}`)}
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
           >
             <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -313,7 +315,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => router.push(`/newsletter/campaigns/${params.id}`)}
+            onClick={async () => router.push(`/newsletter/campaigns/${(await params).id}`)}
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -618,7 +620,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => router.push(`/newsletter/campaigns/${params.id}`)}
+                onClick={async () => router.push(`/newsletter/campaigns/${(await params).id}`)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel

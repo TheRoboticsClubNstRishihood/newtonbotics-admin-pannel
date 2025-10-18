@@ -314,8 +314,8 @@ export default function ProjectRequestsPage() {
       
       for (const requestId of selectedRequests) {
         let url = `/api/project-requests/${requestId}`;
-        let method = 'PUT';
-        let body: any = {};
+        let method: 'PUT' | 'POST' | 'DELETE' = 'PUT';
+        let body: Record<string, unknown> = {};
 
         switch (action) {
           case 'approve':

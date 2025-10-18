@@ -82,7 +82,7 @@ export default function RichTextEditor({ value, onChange, placeholder, className
       if (document.queryCommandState('insertOrderedList')) {
         document.execCommand('insertOrderedList');
       }
-    } catch (_) {
+    } catch {
       // queryCommandState may not be supported in all contexts; best-effort only
     }
     // Normalize block to paragraph
@@ -199,7 +199,7 @@ export default function RichTextEditor({ value, onChange, placeholder, className
                 onKeyDown={onModalKeyDown}
                 className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <p className="mt-2 text-xs text-gray-500">Enter a full URL. If you omit the protocol, we'll add https:// automatically.</p>
+              <p className="mt-2 text-xs text-gray-500">Enter a full URL. If you omit the protocol, we&apos;ll add https:// automatically.</p>
             </div>
             <div className="px-5 py-3 flex items-center justify-end gap-2 bg-gray-50 rounded-b-lg">
               <button type="button" onClick={() => setShowLinkModal(false)} className="px-3 py-1.5 text-sm border rounded hover:bg-white">Cancel</button>

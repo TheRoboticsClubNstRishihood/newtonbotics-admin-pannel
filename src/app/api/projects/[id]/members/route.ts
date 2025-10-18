@@ -3,6 +3,22 @@ import { getBackendUrl } from '@/config/backend';
 
 const backendUrl = getBackendUrl();
 
+interface TimeCommitmentPayload {
+  hoursPerWeek?: number;
+}
+
+interface AddMemberPayload {
+  userId?: string;
+  memberId?: string;
+  role?: string;
+  skills?: string[];
+  responsibilities?: string[];
+  timeCommitment?: TimeCommitmentPayload;
+  hoursPerWeek?: number;
+  contribution?: string;
+  [key: string]: unknown;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,7 +75,7 @@ export async function POST(
     console.log('Adding team member with data (incoming):', body);
 
     // Normalize payload to match backend expectations
-    const normalized: any = {
+    const normalized: AddMemberPayload = {
       userId: body.userId || body.memberId,
       memberId: body.memberId || body.userId, // send both just in case backend expects memberId
       role: body.role,

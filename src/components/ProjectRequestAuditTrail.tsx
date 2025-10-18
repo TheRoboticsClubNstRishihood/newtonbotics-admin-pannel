@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { 
   ClockIcon, 
   UserIcon, 
@@ -42,7 +42,7 @@ export default function ProjectRequestAuditTrail({ projectRequestId, className =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAuditTrail = async () => {
+  const fetchAuditTrail = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -73,13 +73,13 @@ export default function ProjectRequestAuditTrail({ projectRequestId, className =
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectRequestId]);
 
   useEffect(() => {
     if (projectRequestId) {
       fetchAuditTrail();
     }
-  }, [projectRequestId]);
+  }, [projectRequestId, fetchAuditTrail]);
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -117,7 +117,7 @@ export default function ProjectRequestAuditTrail({ projectRequestId, className =
         minute: '2-digit',
         second: '2-digit'
       });
-    } catch (error) {
+    } catch {
       return 'Invalid date';
     }
   };

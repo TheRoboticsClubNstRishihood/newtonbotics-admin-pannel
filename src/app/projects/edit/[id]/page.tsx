@@ -133,8 +133,12 @@ export default function EditProjectPage() {
           startDate: raw.startDate ? String(raw.startDate).split('T')[0] : '',
           endDate: raw.endDate ? String(raw.endDate).split('T')[0] : '',
           budget: raw.budget != null ? String(raw.budget) : '',
-          mentorId: typeof (raw as any).mentorId === 'string' ? (raw as any).mentorId : (raw as any).mentorId?.id || (raw as any).mentor?.id || '',
-          teamLeaderId: typeof (raw as any).teamLeaderId === 'string' ? (raw as any).teamLeaderId : (raw as any).teamLeaderId?.id || (raw as any).teamLeader?.id || '',
+          mentorId: typeof (raw as { mentorId?: string; mentor?: { id?: string } }).mentorId === 'string' 
+            ? (raw as { mentorId?: string }).mentorId! 
+            : ((raw as { mentorId?: { id?: string }; mentor?: { id?: string } }).mentorId?.id || (raw as { mentor?: { id?: string } }).mentor?.id || ''),
+          teamLeaderId: typeof (raw as { teamLeaderId?: string; teamLeader?: { id?: string } }).teamLeaderId === 'string' 
+            ? (raw as { teamLeaderId?: string }).teamLeaderId! 
+            : ((raw as { teamLeaderId?: { id?: string }; teamLeader?: { id?: string } }).teamLeaderId?.id || (raw as { teamLeader?: { id?: string } }).teamLeader?.id || ''),
           imageUrl: raw.imageUrl ?? '',
           videoUrl: raw.videoUrl ?? '',
           githubUrl: raw.githubUrl ?? '',
@@ -205,7 +209,12 @@ export default function EditProjectPage() {
         achievements: formData.achievements ? formData.achievements.split('\n').map(a => a.trim()).filter(Boolean) : undefined
       };
       // Ensure only valid keys are sent
-      Object.keys(projectData).forEach((k) => (projectData as any)[k] === '' || (projectData as any)[k] === undefined ? delete (projectData as any)[k] : null);
+      Object.keys(projectData).forEach((k) => {
+        const value = (projectData as Record<string, unknown>)[k];
+        if (value === '' || value === undefined) {
+          delete (projectData as Record<string, unknown>)[k];
+        }
+      });
 
       // Update the project first
       const response = await fetch(`/api/projects/${params.id}`, {

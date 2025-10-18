@@ -143,11 +143,12 @@ export default function ProjectDetailsPage() {
         // Normalize possible shapes: {data: {project: {...}}} or {data: {...}} or {project: {...}}
         const raw = (data?.data && (data.data.project || data.data)) || data.project || data.item || {};
         // Map backend keys to UI expectations
+        type MinimalUser = { id?: string; _id?: string; firstName?: string; lastName?: string };
         const normalized = {
           ...raw,
           mentor: raw.mentor || raw.mentorId, // backend sends mentorId as object
           teamLeader: raw.teamLeader || raw.teamLeaderId
-        } as any;
+        } as Project;
         console.log('ProjectDetailsPage: normalized projectData', normalized);
         setProject(normalized);
       } else {
@@ -462,11 +463,13 @@ export default function ProjectDetailsPage() {
                 {project.teamMembers && project.teamMembers.length > 0 ? (
                   <div className="space-y-4">
                     {project.teamMembers.map((member, index) => {
-                      const user = (member as any).user || (member as any).userId || member;
-                      const firstName = (member as any).firstName || user?.firstName || ((member as any).name ? String((member as any).name).split(' ')[0] : '');
-                      const lastName = (member as any).lastName || user?.lastName || ((member as any).name ? String((member as any).name).split(' ').slice(1).join(' ') : '');
+                      const unknownMember = member as unknown as { user?: { id?: string; _id?: string; firstName?: string; lastName?: string }; userId?: string; name?: string; firstName?: string; lastName?: string; role?: string; id?: string };
+                      const user = unknownMember.user || ({ id: unknownMember.userId } as { id?: string; _id?: string; firstName?: string; lastName?: string });
+                      const nameFromName = unknownMember.name ? String(unknownMember.name) : '';
+                      const firstName = unknownMember.firstName || user?.firstName || (nameFromName ? nameFromName.split(' ')[0] : '');
+                      const lastName = unknownMember.lastName || user?.lastName || (nameFromName ? nameFromName.split(' ').slice(1).join(' ') : '');
                       const initials = `${(firstName?.charAt?.(0) || '').toUpperCase()}${(lastName?.charAt?.(0) || '').toUpperCase()}` || 'TM';
-                      const key = (member as any).id || user?.id || user?._id || (member as any).userId || `member-${index}`;
+                      const key = unknownMember.id || user?.id || user?._id || unknownMember.userId || `member-${index}`;
                       return (
                         <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center space-x-3">
@@ -479,7 +482,7 @@ export default function ProjectDetailsPage() {
                               <p className="text-sm font-medium text-gray-900">
                                 {firstName || 'Team'} {lastName || 'Member'}
                               </p>
-                              <p className="text-sm text-gray-500">{(member as any).role || 'Member'}</p>
+                              <p className="text-sm text-gray-500">{unknownMember.role || 'Member'}</p>
                             </div>
                           </div>
                         </div>

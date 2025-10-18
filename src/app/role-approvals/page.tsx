@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { 
   MagnifyingGlassIcon,
   PlusIcon,
@@ -49,22 +49,7 @@ export default function RoleApprovals() {
     { value: 'admin', label: 'Admin', color: 'bg-red-100 text-red-800' }
   ];
 
-  useEffect(() => {
-    // Check if user is authenticated before fetching
-    const token = localStorage.getItem('accessToken');
-    const user = localStorage.getItem('user');
-    
-    if (!token || !user) {
-      console.log('No authentication found, redirecting to login');
-      window.location.href = '/';
-      return;
-    }
-    
-    console.log('User authenticated, fetching role approvals');
-    fetchApprovals();
-  }, []);
-
-  const fetchApprovals = async () => {
+  const fetchApprovals = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
@@ -116,7 +101,22 @@ export default function RoleApprovals() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    // Check if user is authenticated before fetching
+    const token = localStorage.getItem('accessToken');
+    const user = localStorage.getItem('user');
+    
+    if (!token || !user) {
+      console.log('No authentication found, redirecting to login');
+      window.location.href = '/';
+      return;
+    }
+    
+    console.log('User authenticated, fetching role approvals');
+    fetchApprovals();
+  }, [fetchApprovals]);
 
   const handleSaveApproval = async (approval: RoleApproval) => {
     try {

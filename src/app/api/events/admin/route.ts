@@ -60,7 +60,10 @@ export async function POST(request: NextRequest) {
     });
 
     const responseText = await response.text();
-    let data: any;
+    // Generic API response shape used by backend
+    type ApiError = { message?: string; details?: unknown; [key: string]: unknown } | undefined;
+    type ApiResponse<T> = T & { success?: boolean; message?: string; error?: ApiError };
+    let data: ApiResponse<Record<string, unknown>>;
     try {
       data = JSON.parse(responseText);
     } catch {

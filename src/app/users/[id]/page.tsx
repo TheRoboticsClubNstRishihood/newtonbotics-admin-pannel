@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeftIcon,
@@ -47,15 +47,7 @@ interface User {
   updatedAt: string;
 }
 
-interface UserStatistics {
-  totalUsers: number;
-  activeUsers: number;
-  verifiedUsers: number;
-  roleDistribution: Array<{
-    role: string;
-    count: number;
-  }>;
-}
+// Removed unused UserStatistics type
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -76,15 +68,7 @@ export default function UserDetailPage() {
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
 
-  useEffect(() => {
-    if (userId) {
-      fetchUserDetails();
-      fetchDepartments();
-      fetchRoles();
-    }
-  }, [userId]);
-
-  const fetchUserDetails = async () => {
+  const fetchUserDetails = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) {
@@ -111,7 +95,15 @@ export default function UserDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      fetchUserDetails();
+      fetchDepartments();
+      fetchRoles();
+    }
+  }, [userId, fetchUserDetails]);
 
   const fetchDepartments = async () => {
     try {

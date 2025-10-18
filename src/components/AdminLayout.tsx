@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   CalendarIcon,
-  AcademicCapIcon,
   NewspaperIcon,
   UserGroupIcon,
   PhotoIcon,
@@ -19,7 +18,6 @@ import {
   BuildingOfficeIcon,
   TagIcon,
   CubeIcon,
-  ChatBubbleLeftRightIcon,
   FolderIcon,
   ClipboardDocumentListIcon,
   ClockIcon

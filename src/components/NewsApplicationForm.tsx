@@ -11,6 +11,18 @@ interface ApplicationFormField {
   options?: string[];
 }
 
+interface ApplicationSubmissionResponseItem {
+  fieldName: string;
+  value: string | number | boolean;
+}
+
+interface ApplicationSubmission {
+  fullName: string;
+  email: string;
+  phone: string;
+  responses: ApplicationSubmissionResponseItem[];
+}
+
 interface ApplicationFormProps {
   newsId: string;
   isEnabled: boolean;
@@ -19,7 +31,7 @@ interface ApplicationFormProps {
   deadline?: string;
   maxApplicants?: number;
   formFields: ApplicationFormField[];
-  onSubmit?: (formData: Record<string, string | number | boolean>) => Promise<void>;
+  onSubmit?: (formData: ApplicationSubmission) => Promise<void>;
   isLoggedIn?: boolean;
 }
 
@@ -93,13 +105,13 @@ export default function NewsApplicationForm({
 
     try {
       // Prepare the application data according to the API specification
-      const applicationData = {
-        fullName: formData.fullName || '',
-        email: formData.email || '',
-        phone: formData.phone || '',
+      const applicationData: ApplicationSubmission = {
+        fullName: String(formData.fullName ?? ''),
+        email: String(formData.email ?? ''),
+        phone: String(formData.phone ?? ''),
         responses: formFields.map(field => ({
           fieldName: field.name,
-          value: formData[field.name] || ''
+          value: (formData[field.name] as string | number | boolean) || ''
         }))
       };
 
@@ -119,6 +131,9 @@ export default function NewsApplicationForm({
       if (response.ok) {
         const data = await response.json();
         console.log('Application success response:', data);
+        if (onSubmit) {
+          await onSubmit(applicationData);
+        }
         setSubmitStatus('success');
       } else {
         const errorData = await response.json().catch(() => ({}));
