@@ -51,9 +51,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const rawBody = await request.json();
+    const rawBody = (await request.json()) as unknown;
     // Sanitize and normalize optional fields before forwarding
-    const body: any = { ...rawBody };
+    interface FeatureOptions {
+      showInNav?: boolean;
+      navLabel?: string;
+      navOrder?: number;
+    }
+    interface EventCreateBody {
+      title: string;
+      description: string;
+      startDate: string;
+      endDate: string;
+      location: string;
+      maxCapacity: number;
+      organizerId: string;
+      category?: string;
+      type: string;
+      isFeatured: boolean;
+      imageUrl?: string;
+      requiresRegistration: boolean;
+      registrationDeadline?: string;
+      registrationFormLink?: string;
+      featureOptions?: FeatureOptions;
+      [key: string]: unknown;
+    }
+    const body: EventCreateBody = { ...(rawBody as Record<string, unknown>) } as EventCreateBody;
     if (!body.requiresRegistration) {
       delete body.registrationDeadline;
       delete body.registrationFormLink;
@@ -92,7 +115,9 @@ export async function POST(request: NextRequest) {
     });
 
     const responseText = await response.text();
-    let data;
+    type ApiError = { message?: string; details?: unknown; [key: string]: unknown } | undefined;
+    type ApiResponse<T> = T & { success?: boolean; message?: string; error?: ApiError };
+    let data: ApiResponse<Record<string, unknown>>;
     
     try {
       data = JSON.parse(responseText);

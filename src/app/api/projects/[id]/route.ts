@@ -3,6 +3,30 @@ import { getBackendUrl } from '@/config/backend';
 
 const backendUrl = getBackendUrl();
 
+interface ProjectUpdatePayload {
+  title?: string;
+  description?: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  mentorId?: string;
+  teamLeaderId?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  githubUrl?: string;
+  documentationUrl?: string;
+  achievements?: string[];
+  tags?: string[];
+  priority?: string | number;
+  difficulty?: string | number;
+  estimatedHours?: number;
+  isPublic?: boolean;
+  isFeatured?: boolean;
+  [key: string]: unknown;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,7 +83,7 @@ export async function PUT(
     console.log('Updating project with data (incoming):', body);
 
     // Normalize payload to satisfy backend schema
-    const normalized: any = {
+    const normalized: ProjectUpdatePayload = {
       title: body.title,
       description: body.description,
       category: body.category,

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { 
   MagnifyingGlassIcon, 
-  FunnelIcon,
   ClockIcon, 
   UserIcon, 
   DocumentTextIcon,
@@ -79,7 +78,7 @@ export default function AdminAuditDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchAllAuditTrails = async () => {
+  const fetchAllAuditTrails = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -112,7 +111,8 @@ export default function AdminAuditDashboard() {
         setTotalPages(Math.ceil((data.data.totalCount || 0) / 20));
         
         // Calculate stats
-        const allEntries = (data.data.projectRequests || []).flatMap(pr => pr.auditTrail);
+        const allEntries: AuditEntry[] = ((data.data.projectRequests || []) as ProjectRequestAudit[])
+          .flatMap((pr: ProjectRequestAudit) => pr.auditTrail);
         const newStats = {
           totalActions: allEntries.length,
           actionsByType: allEntries.reduce((acc, entry) => {
@@ -143,11 +143,11 @@ export default function AdminAuditDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, filters]);
 
   useEffect(() => {
     fetchAllAuditTrails();
-  }, [currentPage, filters]);
+  }, [fetchAllAuditTrails]);
 
   const handleFilterChange = (key: keyof AuditFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -189,7 +189,7 @@ export default function AdminAuditDashboard() {
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch (error) {
+    } catch {
       return 'Invalid date';
     }
   };

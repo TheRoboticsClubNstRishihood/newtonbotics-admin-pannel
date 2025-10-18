@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
-  PlusIcon,
   PencilIcon,
   TrashIcon,
   EyeIcon,
@@ -13,11 +12,9 @@ import {
   ChartBarIcon,
   UsersIcon,
   CheckCircleIcon,
-  XCircleIcon,
   ArrowPathIcon,
   ChevronLeftIcon,
-  ChevronRightIcon,
-  EllipsisVerticalIcon
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import UserDetailModal from '../../components/UserDetailModal';
 import EditUserModal from '../../components/EditUserModal';
@@ -95,14 +92,7 @@ export default function Users() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchStatistics();
-    fetchDepartments();
-    fetchRoles();
-  }, [currentPage, searchQuery, selectedRole, selectedDepartment]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) {
@@ -138,9 +128,9 @@ export default function Users() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, selectedRole, selectedDepartment]);
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
@@ -161,9 +151,9 @@ export default function Users() {
     } finally {
       setIsLoadingStats(false);
     }
-  };
+  }, []);
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
@@ -182,9 +172,9 @@ export default function Users() {
     } catch (error) {
       console.error('Error fetching departments:', error);
     }
-  };
+  }, []);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
@@ -203,7 +193,14 @@ export default function Users() {
     } catch (error) {
       console.error('Error fetching roles:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchStatistics();
+    fetchDepartments();
+    fetchRoles();
+  }, [fetchUsers, fetchStatistics, fetchDepartments, fetchRoles]);
 
   const handleDeactivateUser = async (userId: string) => {
     if (!confirm('Are you sure you want to deactivate this user?')) return;
@@ -496,10 +493,12 @@ export default function Users() {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
                           {user.profileImageUrl ? (
-                            <img
-                              className="h-10 w-10 rounded-full"
+                            <Image
+                              className="h-10 w-10 rounded-full object-cover"
                               src={user.profileImageUrl}
                               alt={`${user.firstName} ${user.lastName}`}
+                              width={40}
+                              height={40}
                             />
                           ) : (
                             <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center">

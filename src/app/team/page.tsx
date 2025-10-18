@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 
 interface ClubMemberAchievement {
@@ -86,13 +86,7 @@ export default function TeamPage() {
     setDepartments(Array.from(unique).sort((a, b) => a.localeCompare(b)));
   }, [members]);
 
-  useEffect(() => {
-    fetchMembers();
-  }, [currentPage, searchQuery, selectedDepartment, selectedSkills.join(',')]);
-
-  // Removed direct call to /api/users/departments since backend 404s. We derive from loaded members.
-
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -132,12 +126,20 @@ export default function TeamPage() {
       } else {
         setError(data?.error?.message || data?.message || 'Failed to fetch club members');
       }
-    } catch (e) {
+    } catch {
       setError('Failed to fetch club members');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, selectedDepartment, selectedSkills]);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
+  // Removed direct call to /api/users/departments since backend 404s. We derive from loaded members.
+
+  // fetchMembers defined above via useCallback
 
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / (pagination.limit || 20)));
 

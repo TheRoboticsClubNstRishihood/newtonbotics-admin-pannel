@@ -13,9 +13,9 @@ export const BACKEND_CONFIG = {
       // Client-side: use NEXT_PUBLIC_ environment variables
       return process.env.NEXT_PUBLIC_BACKEND_URL || this.PRODUCTION_URL;
     } else {
-      // Server-side: prefer BACKEND_URL, fall back to NEXT_PUBLIC_BACKEND_URL (useful in dev), then dev/prod defaults
-      return process.env.BACKEND_URL 
-        || process.env.NEXT_PUBLIC_BACKEND_URL 
+      // Server-side: prefer NEXT_PUBLIC_BACKEND_URL (single source of truth), then BACKEND_URL, then dev/prod defaults
+      return process.env.NEXT_PUBLIC_BACKEND_URL 
+        || process.env.BACKEND_URL 
         || this.DEVELOPMENT_URL 
         || this.PRODUCTION_URL;
     }

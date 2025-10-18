@@ -3,6 +3,31 @@ import { getBackendUrl } from '@/config/backend';
 
 const backendUrl = getBackendUrl();
 
+interface FeatureOptions {
+  showInNav?: boolean;
+  navLabel?: string;
+  navOrder?: number;
+}
+
+interface EventUpdateBody {
+  title?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  maxCapacity?: number;
+  organizerId?: string;
+  category?: string;
+  type?: string;
+  isFeatured?: boolean;
+  imageUrl?: string;
+  requiresRegistration?: boolean;
+  registrationDeadline?: string;
+  registrationFormLink?: string;
+  featureOptions?: FeatureOptions;
+  [key: string]: unknown;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,9 +44,9 @@ export async function PUT(
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
     }
 
-    const rawBody = await request.json();
+    const rawBody = (await request.json()) as unknown;
     // Sanitize optional fields: omit or normalize empty strings
-    const body: any = { ...rawBody };
+    const body: EventUpdateBody = { ...(rawBody as Record<string, unknown>) };
     if (typeof body.registrationDeadline === 'string' && body.registrationDeadline.trim() === '') {
       delete body.registrationDeadline;
     } else if (body.registrationDeadline) {

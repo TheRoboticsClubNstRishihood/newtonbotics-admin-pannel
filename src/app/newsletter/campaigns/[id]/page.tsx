@@ -63,7 +63,7 @@ interface CampaignRecipients {
   };
 }
 
-export default function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [campaign, setCampaign] = useState<NewsletterCampaign | null>(null);
   const [recipients, setRecipients] = useState<CampaignRecipients | null>(null);
@@ -76,17 +76,18 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
   useEffect(() => {
     checkAuthAndFetchData();
-  }, [params.id]);
+  }, [params]);
 
   const checkAuthAndFetchData = async () => {
     try {
+      const { id } = await params;
       const token = localStorage.getItem('accessToken');
       if (!token) {
         router.push('/');
         return;
       }
 
-      await fetchCampaign();
+      await fetchCampaign(id);
     } catch (error) {
       console.error('Error in checkAuthAndFetchData:', error);
       setError('Failed to load campaign data');
@@ -95,12 +96,12 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     }
   };
 
-  const fetchCampaign = async () => {
+  const fetchCampaign = async (id: string) => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}`, {
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -119,12 +120,12 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     }
   };
 
-  const fetchRecipients = async () => {
+  const fetchRecipients = async (id: string) => {
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}/recipients`, {
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}/recipients`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -145,11 +146,12 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
   const handleDeleteCampaign = async () => {
     try {
+      const { id } = await params;
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      console.log('🔄 Deleting campaign', params.id);
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}`, {
+      console.log('🔄 Deleting campaign', id);
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -181,10 +183,11 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
   const handleSendCampaign = async () => {
     try {
+      const { id } = await params;
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}/send`, {
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}/send`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -193,7 +196,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
       });
 
       if (response.ok) {
-        fetchCampaign();
+        fetchCampaign(id);
       } else {
         setError('Failed to send campaign');
       }
@@ -205,10 +208,11 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
   const handleCancelCampaign = async () => {
     try {
+      const { id } = await params;
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}/cancel`, {
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}/cancel`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -217,7 +221,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
       });
 
       if (response.ok) {
-        fetchCampaign();
+        fetchCampaign(id);
       } else {
         setError('Failed to cancel campaign');
       }
@@ -240,7 +244,8 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
       const emailList = testEmails.split(',').map(email => email.trim()).filter(email => email);
       
-      const response = await fetch(`/api/newsletter/admin/campaigns/${params.id}/test`, {
+      const { id } = await params;
+      const response = await fetch(`/api/newsletter/admin/campaigns/${id}/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -347,7 +352,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             {campaign.status === 'draft' && (
               <>
                 <button
-                  onClick={() => router.push(`/newsletter/campaigns/${params.id}/edit`)}
+                  onClick={async () => router.push(`/newsletter/campaigns/${(await params).id}/edit`)}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <PencilIcon className="h-4 w-4 mr-2" />
@@ -578,7 +583,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                     onClick={() => {
                       setShowRecipients(!showRecipients);
                       if (!showRecipients && !recipients) {
-                        fetchRecipients();
+                        params.then(({ id }) => fetchRecipients(id));
                       }
                     }}
                     className="text-sm text-indigo-600 hover:text-indigo-900"

@@ -76,7 +76,37 @@ export async function GET(request: NextRequest) {
         }, { status: usersRes.status });
       }
 
-      const rawUsers: any[] = usersData?.data?.users || usersData?.users || [];
+      interface BasicUser {
+        id?: string;
+        _id?: string;
+        userId?: string;
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        fullName?: string;
+        role?: string;
+        isActive?: boolean;
+        department?: string;
+        skills?: string[] | string;
+        subroles?: string[];
+        specialization?: string;
+        experienceYears?: number;
+        yearOfStudy?: number | null;
+        phone?: string;
+        profileImageUrl?: string;
+        avatarUrl?: string;
+        bio?: string;
+        about?: string;
+        achievements?: string[];
+        socialLinks?: Record<string, string>;
+        currentProjects?: unknown[];
+        emailVerified?: boolean;
+        lastLogin?: string;
+        createdAt?: string;
+        updatedAt?: string;
+      }
+
+      const rawUsers: BasicUser[] = usersData?.data?.users || usersData?.users || [];
 
       const requiredSkills = (skills || '')
         .split(',')
@@ -84,7 +114,7 @@ export async function GET(request: NextRequest) {
         .filter(Boolean)
         .map(s => s.toLowerCase());
 
-      const allowedRoles = new Set(['team_member', 'mentor', 'researcher', 'admin', 'community']);
+      // const allowedRoles = new Set(['team_member', 'mentor', 'researcher', 'admin', 'community']);
 
       // Filter and map to club members
       const filtered = rawUsers
@@ -97,8 +127,8 @@ export async function GET(request: NextRequest) {
           // If backend returned roles beyond allowed set, keep them but prefer allowed; we only exclude students explicitly
           // Skills filter (AND semantics)
           if (requiredSkills.length > 0) {
-            const userSkills: string[] = Array.isArray(u.skills)
-              ? u.skills.map((s: any) => (s ?? '').toString().toLowerCase())
+          const userSkills: string[] = Array.isArray(u.skills)
+              ? (u.skills as unknown[]).map((s) => String(s ?? '').toLowerCase())
               : typeof u.skills === 'string' && u.skills
                 ? u.skills.split(',').map((s: string) => s.trim().toLowerCase())
                 : [];
@@ -114,7 +144,7 @@ export async function GET(request: NextRequest) {
               u.email,
               u.bio,
               ...(Array.isArray(u.skills) ? u.skills : (typeof u.skills === 'string' ? u.skills.split(',') : []))
-            ].filter(Boolean).map((x: any) => x.toString().toLowerCase());
+            ].filter(Boolean).map((x: unknown) => String(x).toLowerCase());
             if (!hay.some((h: string) => h.includes(ql))) return false;
           }
           return true;
@@ -178,7 +208,7 @@ export async function GET(request: NextRequest) {
       path: '/api/users/club-members',
       method: 'GET'
     }, { status: response.status });
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: {

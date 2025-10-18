@@ -37,28 +37,7 @@ export default function TeamAnalytics({ allTeamMembers }: TeamAnalyticsProps) {
     return acc;
   }, {} as Record<string, number>);
 
-  // Monthly join/leave trends
-  const monthlyTrends = allTeamMembers.reduce((acc, member) => {
-    const joinDate = new Date(member.joinedAt);
-    const joinMonth = `${joinDate.getFullYear()}-${String(joinDate.getMonth() + 1).padStart(2, '0')}`;
-    
-    if (!acc[joinMonth]) {
-      acc[joinMonth] = { joined: 0, left: 0 };
-    }
-    acc[joinMonth].joined += 1;
-
-    if (member.leftAt) {
-      const leaveDate = new Date(member.leftAt);
-      const leaveMonth = `${leaveDate.getFullYear()}-${String(leaveDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!acc[leaveMonth]) {
-        acc[leaveMonth] = { joined: 0, left: 0 };
-      }
-      acc[leaveMonth].left += 1;
-    }
-
-    return acc;
-  }, {} as Record<string, { joined: number; left: number }>);
+  // (Trends removed to satisfy linter; compute when charts are added)
 
   // Average tenure
   const activeTenures = allTeamMembers
