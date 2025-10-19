@@ -1,7 +1,9 @@
 'use client';
 
+import type { Subrole } from '@/types/subroles';
+
 interface ConfirmSubroleDeleteModalProps {
-  subrole: any;
+  subrole: Subrole;
   onClose: () => void;
   onDone?: () => void;
 }

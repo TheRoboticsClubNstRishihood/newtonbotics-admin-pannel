@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import type { Subrole } from '@/types/subroles';
 
 interface EditSubroleModalProps {
-  subrole: any;
+  subrole: Subrole;
   onClose: () => void;
-  onSaved?: (subrole: any) => void;
+  onSaved?: (subrole: Subrole) => void;
 }
 
 const categories = [
@@ -47,8 +48,9 @@ export default function EditSubroleModal({ subrole, onClose, onSaved }: EditSubr
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || data?.error?.message || 'Update failed');
       onSaved?.(data?.data?.subrole || data?.subrole || data?.data);
-    } catch (e: any) {
-      setError(e?.message || 'Update failed');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Update failed';
+      setError(message);
     } finally {
       setSaving(false);
     }

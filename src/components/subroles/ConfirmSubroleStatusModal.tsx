@@ -1,7 +1,9 @@
 'use client';
 
+import type { Subrole } from '@/types/subroles';
+
 interface ConfirmSubroleStatusModalProps {
-  subrole: any;
+  subrole: Subrole;
   action: 'deactivate' | 'reactivate';
   onClose: () => void;
   onDone?: () => void;
