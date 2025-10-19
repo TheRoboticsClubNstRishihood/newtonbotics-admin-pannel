@@ -52,3 +52,4 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
 };
 
 export default ActivityFeed;
+

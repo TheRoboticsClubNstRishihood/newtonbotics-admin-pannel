@@ -135,3 +135,4 @@ export interface ActivityFeedProps {
   title?: string;
   maxItems?: number;
 }
+
