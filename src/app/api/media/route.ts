@@ -46,6 +46,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Debug logging
+    console.log('Media API POST - Backend URL:', backendUrl);
+    console.log('Media API POST - Environment variables:', {
+      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+      BACKEND_URL: process.env.BACKEND_URL
+    });
+
     const response = await fetch(`${backendUrl}/api/media`, {
       method: 'POST',
       headers: {

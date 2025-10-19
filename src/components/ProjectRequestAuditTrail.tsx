@@ -20,7 +20,7 @@ interface AuditEntry {
     firstName: string;
     lastName: string;
     email: string;
-  };
+  } | null;
   performedAt: string;
   changes?: {
     field: string;
@@ -195,7 +195,7 @@ export default function ProjectRequestAuditTrail({ projectRequestId, className =
                       <div className="flex items-center text-sm text-gray-700">
                         <UserIcon className="w-4 h-4 mr-2" />
                         <span>
-                          <span className="font-medium text-gray-900">Performed by:</span> {entry.performedBy.firstName} {entry.performedBy.lastName}
+                          <span className="font-medium text-gray-900">Performed by:</span> {entry.performedBy ? `${entry.performedBy.firstName} ${entry.performedBy.lastName}` : 'Unknown User'}
                         </span>
                       </div>
 

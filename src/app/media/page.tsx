@@ -68,6 +68,34 @@ interface CloudinaryResult {
   bytes?: number;
 }
 
+// Helper function to extract error messages from backend responses
+const extractErrorMessage = (data: any): string => {
+  // Handle different error structures from the backend
+  if (typeof data === 'string') {
+    return data;
+  }
+  
+  if (data?.error?.message) {
+    return data.error.message;
+  }
+  
+  if (data?.message) {
+    return data.message;
+  }
+  
+  if (data?.error && typeof data.error === 'string') {
+    return data.error;
+  }
+  
+  // Handle validation errors with details
+  if (data?.error?.details) {
+    return data.error.message || 'Validation error occurred';
+  }
+  
+  // Fallback for unknown error structures
+  return 'An unexpected error occurred';
+};
+
 export default function MediaPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -86,6 +114,7 @@ export default function MediaPage() {
   // Create form
   const [showCreate, setShowCreate] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [createCategoryLoading, setCreateCategoryLoading] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -103,6 +132,7 @@ export default function MediaPage() {
     thumbnailUrl: '',
     fileSize: '',
     dimensions: '',
+    duration: '',
     categoryId: '',
     tags: '',
     isFeatured: false
@@ -142,7 +172,11 @@ export default function MediaPage() {
       const token = localStorage.getItem('accessToken');
       console.log('Fetching categories with token:', token ? 'present' : 'missing');
       
-      const res = await fetch('/api/media/categories', {
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Using backend URL:', backendUrl);
+      
+      const res = await fetch(`${backendUrl}/api/media/categories`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
@@ -150,56 +184,51 @@ export default function MediaPage() {
       });
       
       console.log('Categories response status:', res.status);
+      console.log('Categories response URL:', res.url);
       
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error('Categories fetch failed', err);
+        
+        // If categories API doesn't exist (404), continue without categories
+        if (res.status === 404) {
+          console.warn('Media categories API not implemented on backend, continuing without categories');
+          setCategories([]);
+          return;
+        }
+        
+        console.error('Categories fetch failed', {
+          status: res.status,
+          statusText: res.statusText,
+          url: res.url,
+          error: err
+        });
+        
+        // For other errors, show a user-friendly message
+        setError(`Failed to load categories: ${extractErrorMessage(err)}`);
+        setCategories([]);
         return;
       }
       
       const data = await res.json();
       console.log('Categories response data:', data);
       
-      const rawRoot = (data && data.data) ?? data;
-      let list: Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }> = [];
-      
-      // Helper function to safely get nested array
-      const getNestedArray = (obj: unknown, path: string[]): unknown[] | null => {
-        let current = obj;
-        for (const key of path) {
-          if (current && typeof current === 'object' && key in current) {
-            current = (current as Record<string, unknown>)[key];
-          } else {
-            return null;
-          }
-        }
-        return Array.isArray(current) ? current : null;
-      };
+      if (res.ok) {
+        // Handle API response format: { success: true, data: { items: [] } }
+        const list = data.data?.items || [];
+        console.log('Extracted categories list:', list);
 
-      if (Array.isArray(rawRoot)) {
-        list = rawRoot;
-      } else if (Array.isArray(rawRoot?.categories)) {
-        list = rawRoot.categories;
-      } else if (getNestedArray(rawRoot, ['data', 'categories'])) {
-        list = getNestedArray(rawRoot, ['data', 'categories']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
-      } else if (Array.isArray(rawRoot?.items)) {
-        list = rawRoot.items;
-      } else if (getNestedArray(rawRoot, ['categories', 'items'])) {
-        list = getNestedArray(rawRoot, ['categories', 'items']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
-      } else if (getNestedArray(rawRoot, ['data', 'items'])) {
-        list = getNestedArray(rawRoot, ['data', 'items']) as Array<{ _id?: string; id?: string; name?: string; title?: string; label?: string }>;
+        // Normalize to CategoryItem format
+        const normalizedList: CategoryItem[] = (list || []).map((c: any) => ({
+          _id: c._id || '',
+          name: c.name || 'Unnamed'
+        })).filter((c: CategoryItem) => c._id && c.name);
+
+        console.log('Normalized categories:', normalizedList);
+        setCategories(normalizedList);
+      } else {
+        console.error('Categories fetch failed:', data.error || data.message);
+        setCategories([]);
       }
-
-      console.log('Extracted categories list:', list);
-
-      // Normalize minimal shape {_id, name}
-      const normalizedList: CategoryItem[] = (list || []).map((c: { _id?: string; id?: string; name?: string; title?: string; label?: string }) => ({
-        _id: c?._id || c?.id || '',
-        name: c?.name || c?.title || c?.label || 'Unnamed'
-      })).filter((c: { _id: string; name: string }) => c._id && c.name);
-
-      console.log('Normalized categories:', normalizedList);
-      setCategories(normalizedList);
     } catch (e) {
       console.error('Failed to fetch categories', e);
     }
@@ -211,7 +240,12 @@ export default function MediaPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
       const params = new URLSearchParams({ limit: '100' });
-      const res = await fetch(`/api/users?${params.toString()}`, {
+      
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Fetching users from backend URL:', backendUrl);
+
+      const res = await fetch(`${backendUrl}/api/users?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -219,6 +253,7 @@ export default function MediaPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        // Handle API response format: { success: true, data: { users: [] } }
         const raw = data?.data?.users || data?.users || [];
         if (Array.isArray(raw)) setUsers(raw);
       }
@@ -238,7 +273,11 @@ export default function MediaPage() {
       if (fileType) params.set('fileType', fileType);
       if (categoryId) params.set('categoryId', categoryId);
 
-      const res = await fetch(`/api/media?${params.toString()}`, {
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Fetching media from backend URL:', backendUrl);
+
+      const res = await fetch(`${backendUrl}/api/media?${params.toString()}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
@@ -246,18 +285,19 @@ export default function MediaPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Support both data.data and data directly
-        const list = data.data?.media || data.data?.items || data.media || data.items || [];
-        const pg = data.data?.pagination || data.pagination || {
+        // Handle API response format: { success: true, data: { items: [], pagination: {} } }
+        const list = data.data?.items || [];
+        const pg = data.data?.pagination || {
           total: data.total ?? list.length,
           limit,
           skip: (currentPage - 1) * limit,
           hasMore: list.length === limit
         };
+        console.log('Media fetch result:', { listLength: list.length, pagination: pg, currentPage });
         setItems(list);
         setPagination(pg);
       } else {
-        setError(data.message || 'Failed to fetch media');
+        setError(extractErrorMessage(data) || 'Failed to fetch media');
       }
     } catch (e) {
       console.error('Failed to fetch media', e);
@@ -265,7 +305,13 @@ export default function MediaPage() {
     }
   };
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil((pagination?.total || 0) / (pagination?.limit || limit))), [pagination, limit]);
+  const totalPages = useMemo(() => {
+    const total = pagination?.total || 0;
+    const pageLimit = pagination?.limit || limit;
+    const calculatedPages = Math.ceil(total / pageLimit);
+    console.log('Pagination debug:', { total, pageLimit, calculatedPages, pagination });
+    return Math.max(1, calculatedPages);
+  }, [pagination, limit]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -284,6 +330,26 @@ export default function MediaPage() {
         return <DocumentTextIcon className="w-5 h-5 text-amber-600"/>;
       case 'audio':
         return <MusicalNoteIcon className="w-5 h-5 text-green-600"/>;
+    }
+  };
+
+  const incrementViewCount = async (mediaId: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      
+      await fetch(`${backendUrl}/api/media/${mediaId}/view`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Refresh the media list to update view counts
+      fetchMedia();
+    } catch (error) {
+      console.error('Failed to increment view count:', error);
     }
   };
 
@@ -319,14 +385,37 @@ export default function MediaPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
-    setError('');
+    setCreateError('');
+    
+    // Validate required fields
+    if (!form.title.trim()) {
+      setCreateError('Title is required');
+      setCreateLoading(false);
+      return;
+    }
+    if (!form.fileUrl.trim()) {
+      setCreateError('File URL is required');
+      setCreateLoading(false);
+      return;
+    }
+    if (!form.fileType) {
+      setCreateError('File type is required');
+      setCreateLoading(false);
+      return;
+    }
+    if (!form.uploadedBy) {
+      setCreateError('Uploaded by is required');
+      setCreateLoading(false);
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) {
         window.location.href = '/';
         return;
       }
-      const payload: { title: string; fileUrl: string; fileType: string; uploadedBy: string; description?: string; categoryId?: string; thumbnailUrl?: string; fileSize?: number; dimensions?: string; tags?: string[]; isFeatured?: boolean } = {
+      const payload: { title: string; fileUrl: string; fileType: string; uploadedBy: string; description?: string; categoryId?: string; thumbnailUrl?: string; fileSize?: number; dimensions?: string; duration?: number; tags?: string[]; isFeatured?: boolean } = {
         title: form.title,
         fileUrl: form.fileUrl,
         fileType: form.fileType,
@@ -341,11 +430,16 @@ export default function MediaPage() {
       }
       if (form.fileSize) payload.fileSize = Number(form.fileSize);
       if (form.dimensions) payload.dimensions = form.dimensions;
+      if (form.duration) payload.duration = Number(form.duration);
       if (form.categoryId) payload.categoryId = form.categoryId;
       if (form.tags) payload.tags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
       payload.isFeatured = form.isFeatured;
 
-      const res = await fetch('/api/media', {
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Creating media on backend URL:', backendUrl);
+
+      const res = await fetch(`${backendUrl}/api/media`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -355,17 +449,18 @@ export default function MediaPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || 'Failed to create media');
+        setCreateError(extractErrorMessage(data) || 'Failed to create media');
         return;
       }
       setShowCreate(false);
+      setCreateError('');
       setForm({
-        title: '', fileUrl: '', fileType: '', uploadedBy: '', description: '', thumbnailUrl: '', fileSize: '', dimensions: '', categoryId: '', tags: '', isFeatured: false
+        title: '', fileUrl: '', fileType: '', uploadedBy: '', description: '', thumbnailUrl: '', fileSize: '', dimensions: '', duration: '', categoryId: '', tags: '', isFeatured: false
       });
       fetchMedia();
     } catch (e) {
       console.error('Failed to create media', e);
-      setError('Failed to create media');
+      setCreateError('Failed to create media');
     } finally {
       setCreateLoading(false);
     }
@@ -394,7 +489,10 @@ export default function MediaPage() {
       });
 
       try {
-        const testRes = await fetch('/api/cloudinary/delete', {
+        // Get backend URL from environment
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+        
+        const testRes = await fetch(`${backendUrl}/api/cloudinary/delete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -426,8 +524,12 @@ export default function MediaPage() {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
 
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Deleting media from backend URL:', backendUrl);
+
       // First, get the media item to extract Cloudinary public ID
-      const mediaRes = await fetch(`/api/media/${itemToDelete.id}`, {
+      const mediaRes = await fetch(`${backendUrl}/api/media/${itemToDelete.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }
@@ -463,7 +565,7 @@ export default function MediaPage() {
               });
 
               // Delete from Cloudinary
-              const cloudinaryRes = await fetch('/api/cloudinary/delete', {
+              const cloudinaryRes = await fetch(`${backendUrl}/api/cloudinary/delete`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -495,7 +597,7 @@ export default function MediaPage() {
       }
 
       // Delete from database
-      const res = await fetch(`/api/media/${itemToDelete.id}`, {
+      const res = await fetch(`${backendUrl}/api/media/${itemToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -512,7 +614,7 @@ export default function MediaPage() {
         }
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.message || 'Failed to delete media');
+        setError(extractErrorMessage(data) || 'Failed to delete media');
       }
     } catch (e) {
       console.error('Failed to delete media', e);
@@ -565,7 +667,8 @@ export default function MediaPage() {
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  disabled={categories.length === 0}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">All categories</option>
                   {Array.isArray(categories) && categories.map((c) => (
@@ -581,7 +684,10 @@ export default function MediaPage() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => setShowCreate(true)}
+                onClick={() => {
+                  setShowCreate(true);
+                  setCreateError('');
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
               >
                 <PlusIcon className="w-4 h-4"/>
@@ -589,7 +695,9 @@ export default function MediaPage() {
               </button>
               <button
                 onClick={() => setShowCreateCategory(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition-colors"
+                disabled={categories.length === 0 && !loading}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={categories.length === 0 && !loading ? "Categories API not available" : "Add new category"}
               >
                 <PlusIcon className="w-4 h-4"/>
                 Add Category
@@ -599,7 +707,31 @@ export default function MediaPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-700">{error}</div>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-700">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <strong>Error:</strong> {typeof error === 'string' ? error : JSON.stringify(error)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Categories not available notice */}
+        {categories.length === 0 && !loading && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-sm text-yellow-700">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <strong>Categories not available:</strong> The media categories API is not implemented on the backend yet. 
+                You can still create and manage media files, but category filtering and organization features are disabled.
+              </div>
+            </div>
+          </div>
         )}
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -610,12 +742,49 @@ export default function MediaPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Views</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {items.map(item => (
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="text-center">
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No media found</h3>
+                          <p className="text-gray-500 mb-4">
+                            {searchQuery || fileType || categoryId 
+                              ? "No media matches your current filters. Try adjusting your search criteria."
+                              : "Get started by uploading your first media file."
+                            }
+                          </p>
+                          {!searchQuery && !fileType && !categoryId && (
+                            <button
+                              onClick={() => {
+                                setShowCreate(true);
+                                setCreateError('');
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              Upload Media
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  items.map(item => (
                   <tr key={item._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -656,11 +825,22 @@ export default function MediaPage() {
                       {categories.find(c => c._id === item.categoryId)?.name || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.viewCount || 0}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center gap-2">
-                        <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-900">Open</a>
+                        <a 
+                          href={item.fileUrl} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          onClick={() => incrementViewCount(item._id)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          Open
+                        </a>
                         <button
                           onClick={() => {
                             setEditForm({
@@ -686,7 +866,8 @@ export default function MediaPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -704,15 +885,23 @@ export default function MediaPage() {
                 <div>
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                     <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          setCurrentPage(currentPage - 1);
+                        }
+                      }}
+                      disabled={currentPage <= 1}
                       className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       <ChevronLeftIcon className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => {
+                        if (currentPage < totalPages) {
+                          setCurrentPage(currentPage + 1);
+                        }
+                      }}
+                      disabled={currentPage >= totalPages}
                       className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       <ChevronRightIcon className="w-5 h-5" />
@@ -726,15 +915,33 @@ export default function MediaPage() {
 
         {showCreate && (
           <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreate(false)}></div>
+            <div className="absolute inset-0 bg-black/40" onClick={() => {
+              setShowCreate(false);
+              setCreateError('');
+            }}></div>
             <div className="absolute inset-0 flex items-center justify-center p-4">
               <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                   <h3 className="text-lg font-medium text-gray-900">Create Media</h3>
-                  <button onClick={() => setShowCreate(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                  <button onClick={() => {
+                    setShowCreate(false);
+                    setCreateError('');
+                  }} className="text-gray-500 hover:text-gray-700">✕</button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                   <form id="create-media-form" onSubmit={handleCreate} className="p-6 space-y-4">
+                    {createError && (
+                      <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-700 mb-4">
+                        <div className="flex items-start">
+                          <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          <div>
+                            <strong>Error:</strong> {createError}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
@@ -855,8 +1062,17 @@ export default function MediaPage() {
                       <input value={form.dimensions} readOnly title="Auto-detected for images/videos" maxLength={50} className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-700" />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Duration (seconds)</label>
+                      <input value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} type="number" min={0} placeholder="120" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 placeholder-gray-500" />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <select value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900">
+                      <select 
+                        value={form.categoryId} 
+                        onChange={e => setForm({ ...form, categoryId: e.target.value })} 
+                        disabled={categories.length === 0}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
                         <option value="">None</option>
                         {categories.map(c => (
                           <option key={c._id} value={c._id}>{c.name}</option>
@@ -886,7 +1102,10 @@ export default function MediaPage() {
                   </form>
                 </div>
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0">
-                  <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                  <button type="button" onClick={() => {
+                    setShowCreate(false);
+                    setCreateError('');
+                  }} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
                   <button type="submit" form="create-media-form" disabled={createLoading} className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
                     {createLoading ? 'Creating...' : 'Create'}
                   </button>
@@ -914,7 +1133,11 @@ export default function MediaPage() {
                     const payload: { name: string; description?: string; parentCategoryId?: string } = { name: categoryForm.name };
                     if (categoryForm.description) payload.description = categoryForm.description;
                     if (categoryForm.parentCategoryId) payload.parentCategoryId = categoryForm.parentCategoryId;
-                    const res = await fetch('/api/media/categories', {
+                    // Get backend URL from environment
+                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+                    console.log('Creating category on backend URL:', backendUrl);
+
+                    const res = await fetch(`${backendUrl}/api/media/categories`, {
                       method: 'POST',
                       headers: {
                         'Authorization': `Bearer ${token}`,
@@ -924,7 +1147,11 @@ export default function MediaPage() {
                     });
                     const data = await res.json();
                     if (!res.ok) {
-                      setError(data.message || 'Failed to create category');
+                      if (res.status === 404) {
+                        setError('Media categories API not implemented on backend. Please contact the backend team to implement this feature.');
+                      } else {
+                        setError(extractErrorMessage(data) || 'Failed to create category');
+                      }
                       return;
                     }
                     // Refresh categories list
@@ -1014,7 +1241,11 @@ export default function MediaPage() {
                     if (editForm.fileUrl) {
                       payload.fileUrl = editForm.fileUrl;
                     }
-                    const res = await fetch(`/api/media/${editForm._id}`, {
+                    // Get backend URL from environment
+                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+                    console.log('Updating media on backend URL:', backendUrl);
+
+                    const res = await fetch(`${backendUrl}/api/media/${editForm._id}`, {
                       method: 'PUT',
                       headers: {
                         'Authorization': `Bearer ${token}`,
@@ -1024,7 +1255,7 @@ export default function MediaPage() {
                     });
                     const data = await res.json();
                     if (!res.ok) {
-                      setError(data.message || 'Failed to update media');
+                      setError(extractErrorMessage(data) || 'Failed to update media');
                       return;
                     }
                     setShowEdit(false);
@@ -1128,7 +1359,12 @@ export default function MediaPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <select value={editForm.categoryId} onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900">
+                      <select 
+                        value={editForm.categoryId} 
+                        onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })} 
+                        disabled={categories.length === 0}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
                         <option value="">None</option>
                         {categories.map(c => (
                           <option key={c._id} value={c._id}>{c.name}</option>
