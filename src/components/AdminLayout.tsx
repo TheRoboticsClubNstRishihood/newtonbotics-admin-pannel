@@ -101,6 +101,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     { name: 'Media', icon: PhotoIcon, href: '/media' },
     { name: 'Users', icon: UsersIcon, href: '/users' },
     { name: 'Contact', icon: EnvelopeIcon, href: '/contact' },
+    { name: 'Subroles', icon: TagIcon, href: '/subroles' },
     { name: 'Role Approvals', icon: TagIcon, href: '/role-approvals' },
     { name: 'Inventory', icon: CubeIcon, href: '/inventory' },
     { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
