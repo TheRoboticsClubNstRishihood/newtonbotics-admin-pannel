@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Authorization header required' }, { status: 401 });
     }
     const body = await request.json();
+    
+    // Debug logging
+    console.log('Media Categories API POST - Backend URL:', backendUrl);
+    console.log('Media Categories API POST - Environment variables:', {
+      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+      BACKEND_URL: process.env.BACKEND_URL
+    });
+    
     const response = await fetch(`${backendUrl}/api/media/categories`, {
       method: 'POST',
       headers: {
