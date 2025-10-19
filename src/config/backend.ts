@@ -3,7 +3,7 @@ export const BACKEND_CONFIG = {
   // Production backend URL
   PRODUCTION_URL: 'https://newton-botics-servers-chi.vercel.app',
   
-  // Development backend URL (fallback)
+  // Development backend URL (your local backend)
   DEVELOPMENT_URL: 'http://localhost:3005',
   
   // Get the appropriate backend URL based on environment
@@ -11,13 +11,12 @@ export const BACKEND_CONFIG = {
     // Check for environment variables first
     if (typeof window !== 'undefined') {
       // Client-side: use NEXT_PUBLIC_ environment variables
-      return process.env.NEXT_PUBLIC_BACKEND_URL || this.PRODUCTION_URL;
+      return process.env.NEXT_PUBLIC_BACKEND_URL || this.DEVELOPMENT_URL;
     } else {
-      // Server-side: prefer NEXT_PUBLIC_BACKEND_URL (single source of truth), then BACKEND_URL, then dev/prod defaults
+      // Server-side: prefer NEXT_PUBLIC_BACKEND_URL (single source of truth), then BACKEND_URL, then dev defaults
       return process.env.NEXT_PUBLIC_BACKEND_URL 
         || process.env.BACKEND_URL 
-        || this.DEVELOPMENT_URL 
-        || this.PRODUCTION_URL;
+        || this.DEVELOPMENT_URL;
     }
   },
   

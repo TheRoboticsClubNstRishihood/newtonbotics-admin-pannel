@@ -20,8 +20,11 @@ import {
   CubeIcon,
   FolderIcon,
   ClipboardDocumentListIcon,
-  ClockIcon
+  ClockIcon,
+  HomeIcon
 } from '@heroicons/react/24/outline';
+import { NotificationDropdown } from './notifications/NotificationDropdown';
+import DeveloperCredit from './DeveloperCredit';
 
 interface User {
   id: string;
@@ -86,6 +89,8 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
   };
 
   const menuItems = [
+    { name: 'Dashboard', icon: HomeIcon, href: '/dashboard' },
+    { name: 'Notifications', icon: BellIcon, href: '/notifications' },
     { name: 'Events', icon: CalendarIcon, href: '/events' },
     { name: 'News', icon: NewspaperIcon, href: '/news' },
     { name: 'Newsletter', icon: EnvelopeIcon, href: '/newsletter' },
@@ -156,6 +161,9 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
               Logout
             </button>
           </div>
+
+          {/* Developer Credit */}
+          <DeveloperCredit />
         </div>
       </div>
 
@@ -172,12 +180,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
             
             <div className="flex items-center space-x-4">
               {/* Notifications */}
-              <button className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-100">
-                <BellIcon className="w-6 h-6" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-medium">3</span>
-                </span>
-              </button>
+              <NotificationDropdown />
               
               {/* Profile Dropdown */}
               <div className="relative profile-dropdown">
