@@ -7,17 +7,13 @@ import {
   FunnelIcon,
   EyeIcon,
   TrashIcon,
-  UserGroupIcon,
   CalendarIcon,
-  TagIcon,
-  ChartBarIcon,
   ClipboardDocumentListIcon,
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
   ExclamationTriangleIcon,
   CurrencyDollarIcon,
-  UserIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
   CalendarDaysIcon,
@@ -118,7 +114,6 @@ export default function ProjectRequestsPage() {
     deleted: 0
   });
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
-  const [showBulkActions, setShowBulkActions] = useState(false);
 
   const fetchDeletedCount = async () => {
     try {

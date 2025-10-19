@@ -69,27 +69,28 @@ interface CloudinaryResult {
 }
 
 // Helper function to extract error messages from backend responses
-const extractErrorMessage = (data: any): string => {
+const extractErrorMessage = (data: unknown): string => {
   // Handle different error structures from the backend
   if (typeof data === 'string') {
     return data;
   }
   
-  if (data?.error?.message) {
-    return data.error.message;
+  if (data && typeof data === 'object' && 'error' in data && data.error && typeof data.error === 'object' && 'message' in data.error) {
+    return String(data.error.message);
   }
   
-  if (data?.message) {
-    return data.message;
+  if (data && typeof data === 'object' && 'message' in data) {
+    return String(data.message);
   }
   
-  if (data?.error && typeof data.error === 'string') {
+  if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string') {
     return data.error;
   }
   
   // Handle validation errors with details
-  if (data?.error?.details) {
-    return data.error.message || 'Validation error occurred';
+  if (data && typeof data === 'object' && 'error' in data && data.error && typeof data.error === 'object' && 'details' in data.error) {
+    const errorObj = data.error as { message?: string };
+    return errorObj.message || 'Validation error occurred';
   }
   
   // Fallback for unknown error structures
@@ -218,10 +219,15 @@ export default function MediaPage() {
         console.log('Extracted categories list:', list);
 
         // Normalize to CategoryItem format
-        const normalizedList: CategoryItem[] = (list || []).map((c: any) => ({
-          _id: c._id || '',
-          name: c.name || 'Unnamed'
-        })).filter((c: CategoryItem) => c._id && c.name);
+        const normalizedList: CategoryItem[] = (list || []).map((c: unknown) => {
+          if (c && typeof c === 'object' && '_id' in c && 'name' in c) {
+            return {
+              _id: String(c._id) || '',
+              name: String(c.name) || 'Unnamed'
+            };
+          }
+          return null;
+        }).filter((c: CategoryItem | null): c is CategoryItem => c !== null && Boolean(c._id) && Boolean(c.name));
 
         console.log('Normalized categories:', normalizedList);
         setCategories(normalizedList);
