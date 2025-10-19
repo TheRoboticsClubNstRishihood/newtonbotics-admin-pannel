@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import type { Subrole } from '@/types/subroles';
 
 interface CreateSubroleModalProps {
   onClose: () => void;
-  onCreated?: (subrole: any) => void;
+  onCreated?: (subrole: Subrole) => void;
 }
 
 const categories = [
@@ -46,8 +47,9 @@ export default function CreateSubroleModal({ onClose, onCreated }: CreateSubrole
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || data?.error?.message || 'Create failed');
       onCreated?.(data?.data?.subrole || data?.subrole || data?.data);
-    } catch (e: any) {
-      setError(e?.message || 'Create failed');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Create failed';
+      setError(message);
     } finally {
       setSaving(false);
     }
