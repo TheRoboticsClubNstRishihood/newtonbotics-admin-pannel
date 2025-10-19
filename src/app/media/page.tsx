@@ -293,6 +293,7 @@ export default function MediaPage() {
           skip: (currentPage - 1) * limit,
           hasMore: list.length === limit
         };
+        console.log('Media fetch result:', { listLength: list.length, pagination: pg, currentPage });
         setItems(list);
         setPagination(pg);
       } else {
@@ -304,7 +305,13 @@ export default function MediaPage() {
     }
   };
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil((pagination?.total || 0) / (pagination?.limit || limit))), [pagination, limit]);
+  const totalPages = useMemo(() => {
+    const total = pagination?.total || 0;
+    const pageLimit = pagination?.limit || limit;
+    const calculatedPages = Math.ceil(total / pageLimit);
+    console.log('Pagination debug:', { total, pageLimit, calculatedPages, pagination });
+    return Math.max(1, calculatedPages);
+  }, [pagination, limit]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -878,15 +885,23 @@ export default function MediaPage() {
                 <div>
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                     <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          setCurrentPage(currentPage - 1);
+                        }
+                      }}
+                      disabled={currentPage <= 1}
                       className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       <ChevronLeftIcon className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => {
+                        if (currentPage < totalPages) {
+                          setCurrentPage(currentPage + 1);
+                        }
+                      }}
+                      disabled={currentPage >= totalPages}
                       className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       <ChevronRightIcon className="w-5 h-5" />

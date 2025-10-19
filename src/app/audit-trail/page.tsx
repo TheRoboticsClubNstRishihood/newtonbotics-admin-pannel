@@ -24,7 +24,7 @@ interface AuditEntry {
     firstName: string;
     lastName: string;
     email: string;
-  };
+  } | null;
   performedAt: string;
   changes?: {
     field: string;
@@ -124,8 +124,14 @@ export default function AdminAuditDashboard() {
             .slice(0, 10),
           topUsers: Object.entries(
             allEntries.reduce((acc, entry) => {
-              const userKey = `${entry.performedBy.firstName} ${entry.performedBy.lastName}`;
-              acc[userKey] = (acc[userKey] || 0) + 1;
+              if (entry.performedBy) {
+                const userKey = `${entry.performedBy.firstName} ${entry.performedBy.lastName}`;
+                acc[userKey] = (acc[userKey] || 0) + 1;
+              } else {
+                // Handle cases where performedBy is null
+                const userKey = 'Unknown User';
+                acc[userKey] = (acc[userKey] || 0) + 1;
+              }
               return acc;
             }, {} as Record<string, number>)
           )
@@ -373,7 +379,7 @@ export default function AdminAuditDashboard() {
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
                           <UserIcon className="w-4 h-4 inline mr-1" />
-                          {entry.performedBy.firstName} {entry.performedBy.lastName}
+                          {entry.performedBy ? `${entry.performedBy.firstName} ${entry.performedBy.lastName}` : 'Unknown User'}
                           {entry.changes && (
                             <span className="ml-2 text-gray-700">
                               • {entry.changes.field}: <span className="font-medium">{entry.changes.oldValue}</span> → <span className="font-medium">{entry.changes.newValue}</span>
@@ -386,7 +392,10 @@ export default function AdminAuditDashboard() {
                   
                   {project.auditTrail.length > 3 && (
                     <div className="text-center">
-                      <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                      <button 
+                        onClick={() => window.location.href = `/project-requests/${project._id}`}
+                        className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                      >
                         View {project.auditTrail.length - 3} more entries
                       </button>
                     </div>

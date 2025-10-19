@@ -63,6 +63,10 @@ interface ProjectRequest {
   resources: Resource[];
   createdAt: string;
   updatedAt: string;
+  // Deleted project fields
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 interface ProjectRequestFilters {
@@ -70,6 +74,10 @@ interface ProjectRequestFilters {
   status: string;
   mentorId: string;
   submittedBy: string;
+  showDeleted: boolean;
+  deletedBy: string;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
 }
 
 interface ProjectRequestStats {
@@ -79,6 +87,7 @@ interface ProjectRequestStats {
   approved: number;
   rejected: number;
   onHold: number;
+  deleted: number;
 }
 
 export default function ProjectRequestsPage() {
@@ -89,9 +98,13 @@ export default function ProjectRequestsPage() {
     search: '',
     status: '',
     mentorId: '',
-    submittedBy: ''
+    submittedBy: '',
+    showDeleted: false,
+    deletedBy: '',
+    sortBy: 'deletedAt',
+    sortOrder: 'desc'
   });
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -101,10 +114,38 @@ export default function ProjectRequestsPage() {
     underReview: 0,
     approved: 0,
     rejected: 0,
-    onHold: 0
+    onHold: 0,
+    deleted: 0
   });
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+
+  const fetchDeletedCount = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return 0;
+
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Fetching deleted count from backend URL:', backendUrl);
+
+      const response = await fetch(`${backendUrl}/api/project-requests/deleted?limit=1`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        return data.data.pagination?.total || 0;
+      }
+      return 0;
+    } catch (err) {
+      console.error('Error fetching deleted count:', err);
+      return 0;
+    }
+  };
 
   const fetchProjectRequests = async () => {
     try {
@@ -115,15 +156,34 @@ export default function ProjectRequestsPage() {
         return;
       }
 
+      // Determine which endpoint to use
+      const shouldUseDeletedEndpoint = filters.showDeleted || filters.status === 'deleted';
+      
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append('search', filters.search);
-      if (filters.status) queryParams.append('status', filters.status);
+      
+      // Only add status filter if we're not using the deleted endpoint or if status is not "deleted"
+      if (filters.status && !(shouldUseDeletedEndpoint && filters.status === 'deleted')) {
+        queryParams.append('status', filters.status);
+      }
+      
       if (filters.mentorId) queryParams.append('mentorId', filters.mentorId);
       if (filters.submittedBy) queryParams.append('submittedBy', filters.submittedBy);
+      if (shouldUseDeletedEndpoint && filters.deletedBy) queryParams.append('deletedBy', filters.deletedBy);
+      if (shouldUseDeletedEndpoint) {
+        queryParams.append('sortBy', filters.sortBy);
+        queryParams.append('sortOrder', filters.sortOrder);
+      }
       queryParams.append('limit', '20');
       queryParams.append('skip', ((currentPage - 1) * 20).toString());
 
-      const response = await fetch(`/api/project-requests?${queryParams.toString()}`, {
+      // Get backend URL from environment
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      console.log('Fetching project requests from backend URL:', backendUrl);
+
+      // Use different endpoint based on whether we're showing deleted projects or filtering by deleted status
+      const endpoint = shouldUseDeletedEndpoint ? '/api/project-requests/deleted' : '/api/project-requests';
+      const response = await fetch(`${backendUrl}${endpoint}?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -142,13 +202,15 @@ export default function ProjectRequestsPage() {
         setTotalPages(Math.ceil((pagination.total || 0) / 20));
         
         // Calculate stats
+        const deletedCount = await fetchDeletedCount();
         const newStats = {
           total: pagination.total || 0,
-          pending: items.filter((r: ProjectRequest) => r.status === 'pending').length,
-          underReview: items.filter((r: ProjectRequest) => r.status === 'under_review').length,
-          approved: items.filter((r: ProjectRequest) => r.status === 'approved').length,
-          rejected: items.filter((r: ProjectRequest) => r.status === 'rejected').length,
-          onHold: items.filter((r: ProjectRequest) => r.status === 'on_hold').length
+          pending: items.filter((r: ProjectRequest) => r.status === 'pending' && !r.isDeleted).length,
+          underReview: items.filter((r: ProjectRequest) => r.status === 'under_review' && !r.isDeleted).length,
+          approved: items.filter((r: ProjectRequest) => r.status === 'approved' && !r.isDeleted).length,
+          rejected: items.filter((r: ProjectRequest) => r.status === 'rejected' && !r.isDeleted).length,
+          onHold: items.filter((r: ProjectRequest) => r.status === 'on_hold' && !r.isDeleted).length,
+          deleted: deletedCount
         };
         setStats(newStats);
       } else {
@@ -166,8 +228,19 @@ export default function ProjectRequestsPage() {
     fetchProjectRequests();
   }, [currentPage, filters]);
 
-  const handleFilterChange = (key: keyof ProjectRequestFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const handleFilterChange = (key: keyof ProjectRequestFilters, value: string | boolean) => {
+    const newFilters = { ...filters, [key]: value };
+    
+    // Auto-enable showDeleted when status is set to "deleted"
+    if (key === 'status' && value === 'deleted') {
+      newFilters.showDeleted = true;
+    }
+    // Auto-disable showDeleted when status is changed from "deleted" to something else
+    else if (key === 'status' && value !== 'deleted' && filters.status === 'deleted') {
+      newFilters.showDeleted = false;
+    }
+    
+    setFilters(newFilters);
     setCurrentPage(1);
   };
 
@@ -176,7 +249,8 @@ export default function ProjectRequestsPage() {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/project-requests/${requestId}`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      const response = await fetch(`${backendUrl}/api/project-requests/${requestId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -202,7 +276,8 @@ export default function ProjectRequestsPage() {
   const handleApproveRequest = async (requestId: string) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/project-requests/${requestId}/approve`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      const response = await fetch(`${backendUrl}/api/project-requests/${requestId}/approve`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -227,7 +302,8 @@ export default function ProjectRequestsPage() {
   const handleRejectRequest = async (requestId: string, reason: string) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`/api/project-requests/${requestId}/reject`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
+      const response = await fetch(`${backendUrl}/api/project-requests/${requestId}/reject`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -253,9 +329,10 @@ export default function ProjectRequestsPage() {
   const handleUpdateStatus = async (requestId: string, status: string, reviewNotes?: string) => {
     try {
       const token = localStorage.getItem('accessToken');
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
       console.log('Updating status to:', status, 'for request:', requestId);
       
-      const response = await fetch(`/api/project-requests/${requestId}`, {
+      const response = await fetch(`${backendUrl}/api/project-requests/${requestId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -311,20 +388,21 @@ export default function ProjectRequestsPage() {
 
     try {
       const token = localStorage.getItem('accessToken');
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
       
       for (const requestId of selectedRequests) {
-        let url = `/api/project-requests/${requestId}`;
+        let url = `${backendUrl}/api/project-requests/${requestId}`;
         let method: 'PUT' | 'POST' | 'DELETE' = 'PUT';
         let body: Record<string, unknown> = {};
 
         switch (action) {
           case 'approve':
-            url = `/api/project-requests/${requestId}/approve`;
+            url = `${backendUrl}/api/project-requests/${requestId}/approve`;
             method = 'POST';
             body = {};
             break;
           case 'reject':
-            url = `/api/project-requests/${requestId}/reject`;
+            url = `${backendUrl}/api/project-requests/${requestId}/reject`;
             method = 'POST';
             body = { reason: 'Bulk rejection' };
             break;
@@ -418,7 +496,7 @@ export default function ProjectRequestsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -485,6 +563,17 @@ export default function ProjectRequestsPage() {
               </div>
             </div>
           </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <TrashIcon className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Deleted</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.deleted}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -501,7 +590,7 @@ export default function ProjectRequestsPage() {
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
                 <div className="relative">
@@ -529,6 +618,7 @@ export default function ProjectRequestsPage() {
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                   <option value="on_hold">On Hold</option>
+                  <option value="deleted">Deleted</option>
                 </select>
               </div>
 
@@ -553,12 +643,65 @@ export default function ProjectRequestsPage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Show Deleted</label>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={filters.showDeleted}
+                    onChange={(e) => handleFilterChange('showDeleted', e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Include deleted projects</span>
+                </div>
+              </div>
+
+              {filters.showDeleted && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Deleted By</label>
+                    <input
+                      type="text"
+                      value={filters.deletedBy}
+                      onChange={(e) => handleFilterChange('deletedBy', e.target.value)}
+                      placeholder="Filter by who deleted..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="deletedAt">Deleted Date</option>
+                      <option value="submittedAt">Submitted Date</option>
+                      <option value="title">Title</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                    <select
+                      value={filters.sortOrder}
+                      onChange={(e) => handleFilterChange('sortOrder', e.target.value as 'asc' | 'desc')}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="desc">Newest First</option>
+                      <option value="asc">Oldest First</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
 
         {/* Bulk Actions */}
-        {selectedRequests.length > 0 && (
+        {selectedRequests.length > 0 && !filters.showDeleted && filters.status !== 'deleted' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -626,14 +769,16 @@ export default function ProjectRequestsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={selectedRequests.length === projectRequests.length && projectRequests.length > 0}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </th>
+                  {!(filters.showDeleted || filters.status === 'deleted') && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedRequests.length === projectRequests.length && projectRequests.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Request
                   </th>
@@ -659,15 +804,17 @@ export default function ProjectRequestsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {projectRequests.map((request) => (
-                  <tr key={request._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedRequests.includes(request._id)}
-                        onChange={() => handleSelectRequest(request._id)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </td>
+                  <tr key={request._id} className={`hover:bg-gray-50 ${request.isDeleted ? 'bg-red-50 opacity-75' : ''}`}>
+                    {!(filters.showDeleted || filters.status === 'deleted') && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedRequests.includes(request._id)}
+                          onChange={() => handleSelectRequest(request._id)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{request.title || 'Untitled'}</div>
@@ -683,9 +830,15 @@ export default function ProjectRequestsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
-                        {request.status ? request.status.replace('_', ' ').toUpperCase() : 'UNKNOWN'}
-                      </span>
+                      {request.isDeleted ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          DELETED
+                        </span>
+                      ) : (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
+                          {request.status ? request.status.replace('_', ' ').toUpperCase() : 'UNKNOWN'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center text-sm text-gray-900">
@@ -715,6 +868,14 @@ export default function ProjectRequestsPage() {
                         <CalendarIcon className="w-4 h-4 mr-1" />
                         {formatDate(request.submittedAt || request.createdAt)}
                       </div>
+                      {request.isDeleted && request.deletedAt && (
+                        <div className="text-xs text-red-600 mt-1">
+                          Deleted: {formatDate(request.deletedAt)}
+                          {request.deletedBy && (
+                            <span className="ml-1">by {request.deletedBy}</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
@@ -726,67 +887,71 @@ export default function ProjectRequestsPage() {
                           <EyeIcon className="w-5 h-5" />
                         </a>
                         
-                        {/* Admin Actions - Available for all statuses */}
-                        {request.status !== 'approved' && (
-                          <button 
-                            onClick={() => handleApproveRequest(request._id)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Approve"
-                          >
-                            <CheckCircleIcon className="w-5 h-5" />
-                          </button>
+                        {!request.isDeleted && (
+                          <>
+                            {/* Admin Actions - Available for all statuses */}
+                            {request.status !== 'approved' && (
+                              <button 
+                                onClick={() => handleApproveRequest(request._id)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Approve"
+                              >
+                                <CheckCircleIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                            
+                            {request.status !== 'rejected' && (
+                              <button 
+                                onClick={() => {
+                                  const reason = prompt('Reason for rejection:');
+                                  if (reason) handleRejectRequest(request._id, reason);
+                                }}
+                                className="text-red-600 hover:text-red-900"
+                                title="Reject"
+                              >
+                                <XCircleIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                            
+                            {request.status !== 'under_review' && (
+                              <button 
+                                onClick={() => handleUpdateStatus(request._id, 'under_review')}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="Put Under Review"
+                              >
+                                <ExclamationTriangleIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                            
+                            {request.status !== 'on_hold' && (
+                              <button 
+                                onClick={() => handleUpdateStatus(request._id, 'on_hold')}
+                                className="text-gray-600 hover:text-gray-900"
+                                title="Put On Hold"
+                              >
+                                <Cog6ToothIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                            
+                            {request.status !== 'pending' && (
+                              <button 
+                                onClick={() => handleUpdateStatus(request._id, 'pending')}
+                                className="text-yellow-600 hover:text-yellow-900"
+                                title="Reset to Pending"
+                              >
+                                <ClockIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                            
+                            <button 
+                              onClick={() => handleDeleteProjectRequest(request._id)}
+                              className="text-red-800 hover:text-red-900"
+                              title="Delete"
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </button>
+                          </>
                         )}
-                        
-                        {request.status !== 'rejected' && (
-                          <button 
-                            onClick={() => {
-                              const reason = prompt('Reason for rejection:');
-                              if (reason) handleRejectRequest(request._id, reason);
-                            }}
-                            className="text-red-600 hover:text-red-900"
-                            title="Reject"
-                          >
-                            <XCircleIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                        
-                        {request.status !== 'under_review' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(request._id, 'under_review')}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Put Under Review"
-                          >
-                            <ExclamationTriangleIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                        
-                        {request.status !== 'on_hold' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(request._id, 'on_hold')}
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Put On Hold"
-                          >
-                            <Cog6ToothIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                        
-                        {request.status !== 'pending' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(request._id, 'pending')}
-                            className="text-yellow-600 hover:text-yellow-900"
-                            title="Reset to Pending"
-                          >
-                            <ClockIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                        
-                        <button 
-                          onClick={() => handleDeleteProjectRequest(request._id)}
-                          className="text-red-800 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
                       </div>
                     </td>
                   </tr>
