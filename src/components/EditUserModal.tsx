@@ -26,6 +26,7 @@ interface User {
     notifications: boolean;
     newsletter: boolean;
   };
+  subroles?: string[];
 }
 
 interface EditUserModalProps {
@@ -42,6 +43,8 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [changedFields, setChangedFields] = useState<Set<string>>(new Set());
+  const [availableSubroles, setAvailableSubroles] = useState<Array<{ name: string; displayName: string; description?: string }>>([]);
+  const [selectedSubroles, setSelectedSubroles] = useState<string[]>([]);
 
   console.log('EditUserModal props:', { user, isOpen, departments, roles });
 
@@ -63,8 +66,32 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
         permissions: user.permissions || [],
         preferences: user.preferences || { notifications: true, newsletter: true }
       });
+      setSelectedSubroles(Array.isArray(user.subroles) ? user.subroles : []);
     }
   }, [user, isOpen]);
+
+  useEffect(() => {
+    const fetchSubroles = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+        const res = await fetch('/api/subroles/active', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await res.json();
+        const list = data?.data?.subroles || data?.subroles || [];
+        setAvailableSubroles(Array.isArray(list) ? list : []);
+      } catch (e) {
+        setAvailableSubroles([]);
+      }
+    };
+    if (isOpen) {
+      fetchSubroles();
+    }
+  }, [isOpen]);
 
   // Early return after all hooks are called
   if (!user) {
@@ -148,8 +175,15 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
       console.log('Form data:', formData);
       console.log('Changed fields only:', changedFields);
 
-      // Check if any fields have been changed
-      if (Object.keys(changedFields).length === 0) {
+      // Determine if subroles changed
+      const originalSubroles = Array.isArray(user.subroles) ? [...user.subroles] : [];
+      const currentSubroles = [...selectedSubroles];
+      originalSubroles.sort();
+      currentSubroles.sort();
+      const subrolesChanged = JSON.stringify(originalSubroles) !== JSON.stringify(currentSubroles);
+
+      // If nothing changed at all (neither core fields nor subroles), block submit
+      if (Object.keys(changedFields).length === 0 && !subrolesChanged) {
         setError('No changes detected. Please modify at least one field before saving.');
         return;
       }
@@ -162,39 +196,67 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
         }
       }
 
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(changedFields)
-      });
+      let updatedUser = user;
 
-      console.log('Response status:', response.status);
+      // Update core fields only if any core field changed
+      if (Object.keys(changedFields).length > 0) {
+        const response = await fetch(`/api/users/${user.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(changedFields)
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Success response:', data);
-        onSave(data.data.user);
-        onClose();
-      } else {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        
-        // Show more detailed error information
-        let errorMessage = errorData.message || `Failed to update user (${response.status})`;
-        
-        if (errorData.details) {
-          if (errorData.details.error?.message) {
-            errorMessage = errorData.details.error.message;
-          } else if (errorData.details.message) {
-            errorMessage = errorData.details.message;
+        console.log('Core update status:', response.status);
+
+        if (response.ok) {
+          const data = await response.json();
+          updatedUser = data.data.user || updatedUser;
+        } else {
+          const errorData = await response.json();
+          console.error('Core update error response:', errorData);
+          let errorMessage = errorData.message || `Failed to update user (${response.status})`;
+          if (errorData.details) {
+            if (errorData.details.error?.message) {
+              errorMessage = errorData.details.error.message;
+            } else if (errorData.details.message) {
+              errorMessage = errorData.details.message;
+            }
           }
+          setError(errorMessage);
+          return;
         }
-        
-        setError(errorMessage);
       }
+
+      // Update subroles if changed
+      if (subrolesChanged) {
+        try {
+          const srRes = await fetch(`/api/users/${user.id}/subroles`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ subroles: selectedSubroles })
+          });
+          if (!srRes.ok) {
+            const err = await srRes.json().catch(() => ({}));
+            console.warn('Subroles update failed:', err);
+            setError(err?.message || err?.error?.message || 'Failed to update subroles');
+            return;
+          }
+          updatedUser = { ...updatedUser, subroles: selectedSubroles } as typeof user;
+        } catch (e) {
+          console.warn('Subroles update error:', e);
+          setError('Failed to update subroles');
+          return;
+        }
+      }
+
+      onSave(updatedUser);
+      onClose();
     } catch (error) {
       console.error('Error updating user:', error);
       setError('Network error occurred');
@@ -382,6 +444,38 @@ export default function EditUserModal({ user, isOpen, onClose, onSave, departmen
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
                   placeholder="e.g., Python, Arduino, ROS"
                 />
+              </div>
+
+              {/* Subroles */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Subroles</label>
+                {availableSubroles.length === 0 ? (
+                  <p className="text-sm text-gray-500">No active subroles found.</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {availableSubroles.map((sr) => {
+                      const checked = selectedSubroles.includes(sr.name);
+                      return (
+                        <label key={sr.name} className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedSubroles(prev => checked ? prev.filter(s => s !== sr.name) : [...prev, sr.name]);
+                            }}
+                            className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                          />
+                          <div>
+                            <div className="font-medium text-gray-900">{sr.displayName || sr.name}</div>
+                            {sr.description && (
+                              <div className="text-xs text-gray-500">{sr.description}</div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
