@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AdminLayout from '../components/AdminLayout';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
@@ -19,6 +19,7 @@ interface User {
 
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -45,6 +46,8 @@ export default function Home() {
         setUser(user);
         setIsAuthenticated(true);
         setIsLoading(false);
+        // Redirect to dashboard when authenticated
+        router.push('/dashboard');
         return;
       } catch (error) {
         console.error('Error parsing user data:', error);
@@ -64,6 +67,8 @@ export default function Home() {
       if (data.success) {
         setUser(data.data.user);
         setIsAuthenticated(true);
+        // Redirect to dashboard when authenticated
+        router.push('/dashboard');
       } else {
         // Token is invalid, clear it
         localStorage.removeItem('accessToken');
@@ -79,6 +84,8 @@ export default function Home() {
           const user = JSON.parse(userData);
           setUser(user);
           setIsAuthenticated(true);
+          // Redirect to dashboard when authenticated
+          router.push('/dashboard');
         } catch (parseError) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
@@ -96,13 +103,6 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    setUser(null);
-    setIsAuthenticated(false);
-  };
 
   // If not authenticated, show login form
   if (!isLoading && !isAuthenticated) {
@@ -121,54 +121,17 @@ export default function Home() {
     );
   }
 
-  // Show admin panel when authenticated
-  return <AdminPanel user={user} onLogout={handleLogout} />;
-}
-
-// Admin Panel Component
-function AdminPanel({ user, onLogout }: { user: User | null; onLogout: () => void }) {
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.profile-dropdown')) {
-        setProfileDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Redirect to dashboard when authenticated
   return (
-    <AdminLayout pageTitle="Dashboard">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          Welcome back, {user?.firstName}!
-        </h1>
-        <p className="text-gray-600 mb-4">
-          You are logged in as <strong>{user?.firstName} {user?.lastName}</strong> 
-          with role <strong>{user?.role}</strong>.
-        </p>
-        <p className="text-gray-600">
-          Email: {user?.email}
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Redirecting to dashboard...</p>
       </div>
-    </AdminLayout>
+    </div>
   );
 }
+
 
 // Login Form Component
 function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
@@ -199,7 +162,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
         localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.data.user));
         
-        // Trigger auth check - this will update the state and show admin panel
+        // Trigger auth check - this will update the state and redirect to dashboard
         onLoginSuccess();
       } else {
         setError(data.message || 'Login failed');
