@@ -4,7 +4,7 @@ export const BACKEND_CONFIG = {
   PRODUCTION_URL: 'https://newton-botics-servers-chi.vercel.app',
   
   // Development backend URL (your local backend)
-  DEVELOPMENT_URL: 'http://localhost:3005',
+  DEVELOPMENT_URL: 'http://localhost:3006',
   
   // Get the appropriate backend URL based on environment
   getBackendUrl(): string {

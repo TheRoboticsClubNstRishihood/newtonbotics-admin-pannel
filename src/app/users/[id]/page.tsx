@@ -276,42 +276,44 @@ export default function UserDetailPage() {
                 {user.firstName} {user.lastName}
               </h1>
               <p className="text-lg text-gray-600 mt-1">
-                {formatRole(user.role)} • {user.department || 'No Department'}
+                {user.email === 'monu2feb2004@gmail.com' ? 'Super Admin' : formatRole(user.role)} • {user.department || 'No Department'}
               </p>
             </div>
             
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  console.log('Edit button clicked, opening modal for user:', user);
-                  setIsEditModalOpen(true);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                <PencilIcon className="w-4 h-4" />
-                <span>Edit</span>
-              </button>
-              
-              {user.isActive ? (
+            {user.email !== 'monu2feb2004@gmail.com' && (
+              <div className="flex space-x-3">
                 <button
-                  onClick={handleDeactivateUser}
-                  disabled={isDeactivating}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  onClick={() => {
+                    console.log('Edit button clicked, opening modal for user:', user);
+                    setIsEditModalOpen(true);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                 >
-                  <TrashIcon className="w-4 h-4" />
-                  <span>{isDeactivating ? 'Deactivating...' : 'Deactivate'}</span>
+                  <PencilIcon className="w-4 h-4" />
+                  <span>Edit</span>
                 </button>
-              ) : (
-                <button
-                  onClick={handleReactivateUser}
-                  disabled={isReactivating}
-                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  <ArrowPathIcon className="w-4 h-4" />
-                  <span>{isReactivating ? 'Reactivating...' : 'Reactivate'}</span>
-                </button>
-              )}
-            </div>
+                
+                {user.isActive ? (
+                  <button
+                    onClick={handleDeactivateUser}
+                    disabled={isDeactivating}
+                    className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    <span>{isDeactivating ? 'Deactivating...' : 'Deactivate'}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleReactivateUser}
+                    disabled={isReactivating}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    <span>{isReactivating ? 'Reactivating...' : 'Reactivate'}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -359,9 +361,15 @@ export default function UserDetailPage() {
                 }`}>
                   {user.emailVerified ? 'Email Verified' : 'Email Not Verified'}
                 </span>
-                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-purple-100 text-purple-800">
-                  {formatRole(user.role)}
-                </span>
+                {user.email === 'monu2feb2004@gmail.com' ? (
+                  <span className="inline-flex px-3 py-1 text-sm font-bold rounded-full bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg animate-pulse">
+                    Super Admin
+                  </span>
+                ) : (
+                  <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-purple-100 text-purple-800">
+                    {formatRole(user.role)}
+                  </span>
+                )}
               </div>
 
               {/* Bio */}

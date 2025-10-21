@@ -99,6 +99,7 @@ export default function EventsPage() {
         const data = await response.json();
         console.log('Events loaded:', data.data.items?.length || 0, 'events');
         console.log('First event ID:', data.data.items?.[0]?._id);
+        console.log('First event imageUrl:', data.data.items?.[0]?.imageUrl);
         setEvents(data.data.items || []);
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -346,15 +347,30 @@ export default function EventsPage() {
                           <div className="flex-shrink-0 h-12 w-12">
                             {event.imageUrl ? (
                               <img
-                                src={event.imageUrl}
+                                src={event.imageUrl.includes('cloudinary.com') 
+                                  ? event.imageUrl.replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
+                                  : event.imageUrl}
                                 alt={event.title}
                                 className="h-12 w-12 rounded-lg object-cover"
+                                onError={(e) => {
+                                  console.log('Image failed to load:', event.imageUrl);
+                                  console.log('Trying fallback URL...');
+                                  // Try original URL as fallback
+                                  if (e.currentTarget.src !== event.imageUrl) {
+                                    e.currentTarget.src = event.imageUrl;
+                                    return;
+                                  }
+                                  // If still fails, show fallback icon
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                }}
                               />
-                            ) : (
-                              <div className="h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                <CalendarIcon className="h-6 w-6 text-indigo-600" />
-                              </div>
-                            )}
+                            ) : null}
+                            <div 
+                              className={`h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center ${event.imageUrl ? 'hidden' : ''}`}
+                            >
+                              <CalendarIcon className="h-6 w-6 text-indigo-600" />
+                            </div>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-black">{event.title}</div>

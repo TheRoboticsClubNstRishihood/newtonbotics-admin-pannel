@@ -176,25 +176,6 @@ export default function Profile() {
             </div>
           </div>
         </div>
-
-        {/* Account Actions */}
-        <div className="bg-white rounded-lg shadow p-6 mt-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Account Actions</h3>
-          <div className="flex flex-wrap gap-4">
-            <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-              Edit Profile
-            </button>
-            <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-              Change Password
-            </button>
-            <button className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors">
-              Security Settings
-            </button>
-            <button className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
-              Delete Account
-            </button>
-          </div>
-        </div>
       </div>
     </AdminLayout>
   );
