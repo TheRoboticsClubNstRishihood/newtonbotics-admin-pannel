@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,8 +33,7 @@ export async function GET(request: NextRequest) {
     if (categoryId) queryParams.append('categoryId', categoryId);
     if (search) queryParams.append('search', search);
 
-    // Make request to your backend API (prefer server-side envs)
-    const backendUrl = process.env.BACKEND_URL || process.env.DEV_BACKEND_URL || 'http://localhost:3005';
+    // Make request to your backend API
     const response = await fetch(`${backendUrl}/api/news?${queryParams}`, {
       headers: {
         'Authorization': authHeader,
@@ -104,11 +106,9 @@ export async function POST(request: NextRequest) {
 
     console.log('API Route - Received body:', body);
 
-    // Make request to your backend API (prefer server-side envs)
-    const backendUrl = process.env.BACKEND_URL || process.env.DEV_BACKEND_URL || 'http://localhost:3005';
+    // Make request to your backend API
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - Environment variables:', {
-      BACKEND_URL: process.env.BACKEND_URL,
       NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL
     });
     

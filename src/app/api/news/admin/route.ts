@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function POST(request: NextRequest) {
   console.log('Admin API Route POST called');
@@ -21,10 +24,8 @@ export async function POST(request: NextRequest) {
     console.log('API Route - Received body:', body);
 
     // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - Environment variables:', {
-      BACKEND_URL: process.env.BACKEND_URL,
       NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL
     });
     

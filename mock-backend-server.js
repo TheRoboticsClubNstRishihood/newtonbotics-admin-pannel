@@ -3,7 +3,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const PORT = 3005;
+const PORT = 3006;
 
 // Middleware
 app.use(cors());
@@ -139,6 +139,21 @@ let events = [
   }
 ];
 
+// Mock admin user data
+const ADMIN_USER = {
+  id: '64f8a1b2c3d4e5f6a7b8c9d0',
+  email: 'admin@newtonbotics.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  role: 'admin',
+  isActive: true,
+  emailVerified: true,
+  permissions: ['*'],
+  lastLogin: new Date().toISOString(),
+  // Password hash for "AdminPass123!"
+  passwordHash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
+};
+
 // Authentication middleware (mock)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -162,6 +177,192 @@ const authenticateToken = (req, res, next) => {
     });
   }
 };
+
+// Authentication Routes
+
+// POST /api/auth/login
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Check if user exists and credentials match
+    if (email !== ADMIN_USER.email) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // For mock purposes, accept any password or the specific password
+    if (password !== 'AdminPass123!' && password !== 'admin') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if user is active
+    if (!ADMIN_USER.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated'
+      });
+    }
+
+    // Generate mock tokens
+    const accessToken = `mock-access-token-${Date.now()}`;
+    const refreshToken = `mock-refresh-token-${Date.now()}`;
+
+    // Update last login
+    const updatedUser = {
+      ...ADMIN_USER,
+      lastLogin: new Date().toISOString()
+    };
+
+    // Return success response
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          role: updatedUser.role,
+          isActive: updatedUser.isActive,
+          emailVerified: updatedUser.emailVerified,
+          permissions: updatedUser.permissions,
+          lastLogin: updatedUser.lastLogin
+        },
+        tokens: {
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+          expiresIn: '24h'
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/auth/me
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  try {
+    // Return user profile
+    return res.json({
+      success: true,
+      data: {
+        user: {
+          id: ADMIN_USER.id,
+          email: ADMIN_USER.email,
+          firstName: ADMIN_USER.firstName,
+          lastName: ADMIN_USER.lastName,
+          role: ADMIN_USER.role,
+          isActive: ADMIN_USER.isActive,
+          emailVerified: ADMIN_USER.emailVerified,
+          permissions: ADMIN_USER.permissions,
+          lastLogin: ADMIN_USER.lastLogin
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/auth/refresh
+app.post('/api/auth/refresh', (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    // Validate input
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    // For mock purposes, accept any refresh token
+    if (!refreshToken.includes('mock-refresh-token')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired refresh token'
+      });
+    }
+
+    // Generate new tokens
+    const newAccessToken = `mock-access-token-${Date.now()}`;
+    const newRefreshToken = `mock-refresh-token-${Date.now()}`;
+
+    // Return new tokens
+    return res.json({
+      success: true,
+      message: 'Tokens refreshed successfully',
+      data: {
+        tokens: {
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+          expiresIn: '24h'
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/auth/logout
+app.post('/api/auth/logout', (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    // Validate input
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    // For mock purposes, just return success
+    return res.json({
+      success: true,
+      message: 'Logout successful'
+    });
+
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 
 // News Articles Routes
 
@@ -1044,6 +1245,288 @@ app.delete('/api/role-approvals/:email', (req, res) => {
   }
 });
 
+// Dashboard endpoints - Mock data structure matching frontend expectations
+const getDashboardData = (period = '30d', includeCharts = false) => {
+  const now = new Date();
+  const startDate = new Date(now.getTime() - (period === '7d' ? 7 : period === '30d' ? 30 : 90) * 24 * 60 * 60 * 1000);
+  
+  return {
+    period,
+    dateRange: {
+      start: startDate.toISOString(),
+      end: now.toISOString()
+    },
+    overview: {
+      totalUsers: 156,
+      activeUsers: 142,
+      totalProjects: 23,
+      activeProjects: 18,
+      totalWorkshops: 8,
+      upcomingEvents: 5,
+      totalNews: 12,
+      totalEquipment: 45,
+      pendingRequests: 7,
+      contactSubmissions: 23,
+      newsletterSubscribers: 89,
+      unreadNotifications: 3
+    },
+    recentActivity: {
+      newUsers: 12,
+      newProjects: 3,
+      newRequests: 5,
+      newWorkshops: 2,
+      newEvents: 1,
+      newNews: 4,
+      newContacts: 8
+    },
+    statusBreakdown: {
+      projects: [
+        { _id: 'active', count: 18 },
+        { _id: 'completed', count: 5 },
+        { _id: 'pending', count: 3 }
+      ],
+      requests: [
+        { _id: 'pending', count: 7 },
+        { _id: 'approved', count: 12 },
+        { _id: 'rejected', count: 3 }
+      ],
+      workshops: [
+        { _id: 'upcoming', count: 5 },
+        { _id: 'completed', count: 3 }
+      ],
+      events: [
+        { _id: 'upcoming', count: 5 },
+        { _id: 'completed', count: 8 }
+      ],
+      equipment: [
+        { _id: 'available', count: 32 },
+        { _id: 'in-use', count: 13 }
+      ]
+    },
+    charts: includeCharts ? {
+      userGrowth: [
+        { _id: { year: 2024, month: 1, day: 1 }, count: 120 },
+        { _id: { year: 2024, month: 1, day: 15 }, count: 135 },
+        { _id: { year: 2024, month: 2, day: 1 }, count: 142 },
+        { _id: { year: 2024, month: 2, day: 15 }, count: 156 }
+      ],
+      projectActivity: [
+        { _id: { year: 2024, month: 1, day: 1 }, count: 15 },
+        { _id: { year: 2024, month: 1, day: 15 }, count: 18 },
+        { _id: { year: 2024, month: 2, day: 1 }, count: 21 },
+        { _id: { year: 2024, month: 2, day: 15 }, count: 23 }
+      ],
+      requestTrends: [
+        { _id: { year: 2024, month: 1, day: 1 }, count: 8 },
+        { _id: { year: 2024, month: 1, day: 15 }, count: 12 },
+        { _id: { year: 2024, month: 2, day: 1 }, count: 15 },
+        { _id: { year: 2024, month: 2, day: 15 }, count: 18 }
+      ],
+      equipmentUtilization: [
+        { _id: 'available', count: 32 },
+        { _id: 'in-use', count: 13 }
+      ],
+      notificationTrends: [
+        { _id: { year: 2024, month: 1, day: 1 }, count: 5 },
+        { _id: { year: 2024, month: 1, day: 15 }, count: 8 },
+        { _id: { year: 2024, month: 2, day: 1 }, count: 6 },
+        { _id: { year: 2024, month: 2, day: 15 }, count: 3 }
+      ]
+    } : undefined
+  };
+};
+
+// GET /api/admin/dashboard/summary
+app.get('/api/admin/dashboard/summary', authenticateToken, (req, res) => {
+  try {
+    const { period = '30d', includeCharts = 'false' } = req.query;
+    
+    const dashboardData = getDashboardData(period, includeCharts === 'true');
+
+    res.json({
+      success: true,
+      data: dashboardData
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard summary:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Subroles endpoints
+let subroles = [
+  {
+    _id: '64f8a1b2c3d4e5f6a7b8c9d1',
+    name: 'Team Lead',
+    description: 'Lead team projects and coordinate activities',
+    permissions: ['project_create', 'project_edit', 'team_manage'],
+    isActive: true,
+    createdAt: '2023-09-05T08:00:00.000Z',
+    updatedAt: '2023-09-05T08:00:00.000Z'
+  },
+  {
+    _id: '64f8a1b2c3d4e5f6a7b8c9d2',
+    name: 'Developer',
+    description: 'Develop and maintain technical projects',
+    permissions: ['project_create', 'project_edit'],
+    isActive: true,
+    createdAt: '2023-09-05T08:00:00.000Z',
+    updatedAt: '2023-09-05T08:00:00.000Z'
+  },
+  {
+    _id: '64f8a1b2c3d4e5f6a7b8c9d3',
+    name: 'Designer',
+    description: 'Handle UI/UX design and visual elements',
+    permissions: ['project_edit'],
+    isActive: false,
+    createdAt: '2023-09-05T08:00:00.000Z',
+    updatedAt: '2023-09-05T08:00:00.000Z'
+  }
+];
+
+// GET /api/subroles
+app.get('/api/subroles', authenticateToken, (req, res) => {
+  try {
+    const { limit = 50, skip = 0, isActive, q } = req.query;
+    
+    let filteredSubroles = [...subroles];
+
+    // Apply filters
+    if (isActive !== undefined) {
+      filteredSubroles = filteredSubroles.filter(subrole => 
+        subrole.isActive === (isActive === 'true')
+      );
+    }
+
+    if (q) {
+      const searchLower = q.toLowerCase();
+      filteredSubroles = filteredSubroles.filter(subrole =>
+        subrole.name.toLowerCase().includes(searchLower) ||
+        subrole.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply pagination
+    const total = filteredSubroles.length;
+    const paginatedSubroles = filteredSubroles.slice(parseInt(skip), parseInt(skip) + parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        items: paginatedSubroles,
+        pagination: {
+          total,
+          limit: parseInt(limit),
+          skip: parseInt(skip),
+          hasMore: parseInt(skip) + parseInt(limit) < total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subroles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/subroles
+app.post('/api/subroles', authenticateToken, (req, res) => {
+  try {
+    const { name, description, permissions, isActive = true } = req.body;
+
+    // Validation
+    if (!name || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        error: {
+          details: {
+            errors: [
+              { field: 'name', message: 'Name is required' },
+              { field: 'description', message: 'Description is required' }
+            ]
+          }
+        }
+      });
+    }
+
+    const newSubrole = {
+      _id: uuidv4().replace(/-/g, '').substring(0, 24),
+      name,
+      description,
+      permissions: permissions || [],
+      isActive,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    subroles.push(newSubrole);
+
+    res.status(201).json({
+      success: true,
+      message: 'Subrole created',
+      data: {
+        item: newSubrole
+      }
+    });
+  } catch (error) {
+    console.error('Error creating subrole:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/subroles/active
+app.get('/api/subroles/active', authenticateToken, (req, res) => {
+  try {
+    const activeSubroles = subroles.filter(subrole => subrole.isActive);
+    
+    res.json({
+      success: true,
+      data: {
+        items: activeSubroles
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching active subroles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/subroles/categories
+app.get('/api/subroles/categories', authenticateToken, (req, res) => {
+  try {
+    const categories = [
+      { id: 'technical', name: 'Technical', description: 'Technical roles and responsibilities' },
+      { id: 'management', name: 'Management', description: 'Management and leadership roles' },
+      { id: 'creative', name: 'Creative', description: 'Creative and design roles' }
+    ];
+    
+    res.json({
+      success: true,
+      data: {
+        categories
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subrole categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -1057,6 +1540,11 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Mock backend server running on http://localhost:${PORT}`);
   console.log('Available endpoints:');
+  console.log('Authentication:');
+  console.log('- POST /api/auth/login');
+  console.log('- GET  /api/auth/me');
+  console.log('- POST /api/auth/refresh');
+  console.log('- POST /api/auth/logout');
   console.log('News:');
   console.log('- GET  /api/news');
   console.log('- POST /api/news');
@@ -1072,6 +1560,14 @@ app.listen(PORT, () => {
   console.log('- GET  /api/events/:id');
   console.log('- PUT  /api/events/:id');
   console.log('- DELETE /api/events/:id');
+  console.log('Dashboard:');
+  console.log('- GET  /api/admin/dashboard/summary');
+  console.log('- GET  /api/admin/dashboard/notifications');
+  console.log('Subroles:');
+  console.log('- GET  /api/subroles');
+  console.log('- POST /api/subroles');
+  console.log('- GET  /api/subroles/active');
+  console.log('- GET  /api/subroles/categories');
   console.log('Media Categories:');
   console.log('- GET  /api/media/categories');
   console.log('- POST /api/media/categories');
@@ -1083,4 +1579,5 @@ app.listen(PORT, () => {
   console.log('- DELETE /api/role-approvals/:email');
   console.log('- GET  /api/health');
   console.log('\nUse any Bearer token for authentication (e.g., "Bearer mock-token")');
+  console.log('Login credentials: admin@newtonbotics.com / admin');
 });

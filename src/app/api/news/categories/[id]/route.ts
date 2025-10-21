@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function PUT(
   request: NextRequest,
@@ -18,7 +21,6 @@ export async function PUT(
     const body = await request.json();
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const resolvedParams = await params;
     const response = await fetch(`${backendUrl}/api/news/categories/${resolvedParams.id}`, {
       method: 'PUT',
@@ -67,7 +69,6 @@ export async function DELETE(
     }
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const resolvedParams = await params;
     const response = await fetch(`${backendUrl}/api/news/categories/${resolvedParams.id}`, {
       method: 'DELETE',

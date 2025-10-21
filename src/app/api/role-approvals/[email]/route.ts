@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(
   request: NextRequest,
@@ -20,7 +23,6 @@ export async function GET(
       );
     }
 
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(email)}`, {
       headers: {
         'Authorization': token,
@@ -65,7 +67,6 @@ export async function DELETE(
       );
     }
 
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/role-approvals/${encodeURIComponent(email)}`, {
       method: 'DELETE',
       headers: {

@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function POST(
   request: NextRequest,
@@ -17,7 +20,6 @@ export async function POST(
     const authHeader = request.headers.get('authorization');
 
     // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
     const resolvedParams = await params;
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - News ID:', resolvedParams.id);

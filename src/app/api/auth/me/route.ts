@@ -1,93 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 
-// Mock admin user data (in production, this would come from a database)
-const ADMIN_USER = {
-  id: '64f8a1b2c3d4e5f6a7b8c9d0',
-  email: 'admin@newtonbotics.com',
-  firstName: 'Admin',
-  lastName: 'User',
-  role: 'admin',
-  isActive: true,
-  emailVerified: true,
-  permissions: ['*'],
-  lastLogin: '2023-09-05T10:30:00.000Z'
-};
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-// Helper function to verify JWT token
-function verifyToken(token: string) {
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; exp: number };
-    return { valid: true, payload: decoded };
-  } catch {
-    return { valid: false, payload: null };
-  }
-}
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3006';
 
 export async function GET(request: NextRequest) {
   try {
     // Get authorization header
     const authHeader = request.headers.get('authorization');
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Authorization header missing or invalid'
+          message: 'Authorization header missing'
         },
         { status: 401 }
       );
     }
 
-    // Extract token
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    
-    // Verify token
-    const { valid, payload } = verifyToken(token);
-    
-    if (!valid) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Invalid or expired token'
-        },
-        { status: 401 }
-      );
-    }
-
-    // Check if user exists and is active
-    if (!payload || payload.email !== ADMIN_USER.email || !ADMIN_USER.isActive) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'User not found or inactive'
-        },
-        { status: 401 }
-      );
-    }
-
-    // Return user profile
-    return NextResponse.json({
-      success: true,
-      data: {
-        user: {
-          id: ADMIN_USER.id,
-          email: ADMIN_USER.email,
-          firstName: ADMIN_USER.firstName,
-          lastName: ADMIN_USER.lastName,
-          role: ADMIN_USER.role,
-          isActive: ADMIN_USER.isActive,
-          emailVerified: ADMIN_USER.emailVerified,
-          permissions: ADMIN_USER.permissions,
-          lastLogin: ADMIN_USER.lastLogin
-        }
+    // Forward the request to the mock backend
+    const response = await fetch(`${backendUrl}/api/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
       }
     });
 
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('Get profile proxy error:', error);
     return NextResponse.json(
       {
         success: false,
