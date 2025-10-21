@@ -18,7 +18,6 @@ import {
 } from '@heroicons/react/24/outline';
 import UserDetailModal from '../../components/UserDetailModal';
 import EditUserModal from '../../components/EditUserModal';
-import DebugModal from '../../components/DebugModal';
 import AdminLayout from '../../components/AdminLayout';
 
 interface User {
@@ -90,7 +89,6 @@ export default function Users() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -275,12 +273,6 @@ export default function Users() {
     console.log('Modal state set:', { selectedUser: user, isEditModalOpen: true });
   };
 
-  const handleDebugUser = (user: User) => {
-    console.log('Debug user clicked:', user);
-    setSelectedUser(user);
-    setIsDebugModalOpen(true);
-  };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedUser(null);
@@ -288,11 +280,6 @@ export default function Users() {
 
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
-    setSelectedUser(null);
-  };
-
-  const handleCloseDebugModal = () => {
-    setIsDebugModalOpen(false);
     setSelectedUser(null);
   };
 
@@ -520,9 +507,15 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {user.role.replace('_', ' ')}
-                      </span>
+                      {user.email === 'monu2feb2004@gmail.com' ? (
+                        <span className="inline-flex px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg animate-pulse">
+                          Super Admin
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {user.role.replace('_', ' ')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {user.department || '-'}
@@ -550,33 +543,30 @@ export default function Users() {
                         >
                           <EyeIcon className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => handleEditUser(user)}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          <PencilIcon className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDebugUser(user)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Debug"
-                        >
-                          🐛
-                        </button>
-                        {user.isActive ? (
-                          <button
-                            onClick={() => handleDeactivateUser(user.id)}
-                            className="text-red-600 hover:text-red-900"
+                        {user.email !== 'monu2feb2004@gmail.com' && (
+                          <button 
+                            onClick={() => handleEditUser(user)}
+                            className="text-gray-600 hover:text-gray-900"
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <PencilIcon className="w-4 h-4" />
                           </button>
-                        ) : (
-                          <button
-                            onClick={() => handleReactivateUser(user.id)}
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            <ArrowPathIcon className="w-4 h-4" />
-                          </button>
+                        )}
+                        {user.email !== 'monu2feb2004@gmail.com' && (
+                          user.isActive ? (
+                            <button
+                              onClick={() => handleDeactivateUser(user.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleReactivateUser(user.id)}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              <ArrowPathIcon className="w-4 h-4" />
+                            </button>
+                          )
                         )}
                       </div>
                     </td>
@@ -654,13 +644,6 @@ export default function Users() {
         onSave={handleSaveUser}
         departments={departments}
         roles={roles}
-      />
-
-      {/* Debug Modal */}
-      <DebugModal
-        user={selectedUser}
-        isOpen={isDebugModalOpen}
-        onClose={handleCloseDebugModal}
       />
     </AdminLayout>
   );

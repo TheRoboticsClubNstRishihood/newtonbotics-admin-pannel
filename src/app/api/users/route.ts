@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const backendUrl = process.env.BACKEND_URL || 'https://newton-botics-servers-chi.vercel.app';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3006';
 
 export async function GET(request: NextRequest) {
   try {

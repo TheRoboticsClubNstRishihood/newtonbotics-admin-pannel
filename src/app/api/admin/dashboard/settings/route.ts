@@ -1,106 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
 
-// Mock notification settings data
-const mockNotificationSettings = {
-  email: {
-    enabled: true,
-    projectRequests: true,
-    events: true,
-    news: true,
-    equipment: true,
-    system: true,
-    frequency: 'immediate' as const
-  },
-  push: {
-    enabled: true,
-    projectRequests: true,
-    events: true,
-    news: false,
-    equipment: true,
-    system: true,
-    frequency: 'immediate' as const
-  },
-  sms: {
-    enabled: false,
-    projectRequests: false,
-    events: true,
-    news: false,
-    equipment: false,
-    system: true,
-    frequency: 'daily' as const
-  },
-  inApp: {
-    enabled: true,
-    projectRequests: true,
-    events: true,
-    news: true,
-    equipment: true,
-    system: true,
-    frequency: 'immediate' as const
-  },
-  frequency: {
-    immediate: true,
-    daily: false,
-    weekly: false,
-    monthly: false
-  },
-  quietHours: {
-    enabled: true,
-    start: '22:00',
-    end: '08:00',
-    timezone: 'UTC'
-  },
-  admin: {
-    receiveAllNotifications: true,
-    notificationDigest: 'daily' as const,
-    systemAlerts: true,
-    userActivityAlerts: true
-  }
-};
-
-// Helper function to get auth headers
-function getAuthHeaders(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) {
-    throw new Error('No authorization header');
-  }
-  return {
-    'Authorization': authHeader,
-    'Content-Type': 'application/json',
-  };
-}
+const backendUrl = getBackendUrl();
 
 // GET /api/admin/dashboard/settings
 export async function GET(request: NextRequest) {
   try {
+    const token = request.headers.get('authorization');
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
+    }
+
     console.log('🔔 Notification Settings API - GET request received');
-    
-    // Validate auth header
-    getAuthHeaders(request);
-    
-    console.log('✅ Successfully fetched notification settings');
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        settings: mockNotificationSettings
-      },
-      timestamp: new Date().toISOString()
+
+    const url = `${backendUrl}/api/admin/dashboard/settings`;
+    console.log('🔗 Fetching notification settings from:', url);
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json'
+      }
     });
-    
+
+    if (!response.ok) {
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Successfully fetched notification settings');
+
+    return NextResponse.json(data);
+
   } catch (error) {
-    console.error('❌ Notification Settings API error:', error);
+    console.error('Error fetching notification settings:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: { 
-          message: error instanceof Error ? error.message : 'Internal server error',
-          details: { statusCode: 500, isOperational: true }
-        },
-        timestamp: new Date().toISOString(),
-        path: '/api/admin/dashboard/settings',
-        method: 'GET'
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -109,41 +44,41 @@ export async function GET(request: NextRequest) {
 // PUT /api/admin/dashboard/settings
 export async function PUT(request: NextRequest) {
   try {
+    const token = request.headers.get('authorization');
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
+    }
+
     console.log('🔔 Update Notification Settings API - PUT request received');
-    
-    // Validate auth header
-    getAuthHeaders(request);
-    
+
     const body = await request.json();
     console.log('📝 Settings to update:', JSON.stringify(body, null, 2));
-    
-    // Update the mock settings (in a real app, this would be saved to a database)
-    Object.assign(mockNotificationSettings, body);
-    
-    console.log('✅ Successfully updated notification settings');
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Notification settings updated successfully',
-      data: {
-        settings: mockNotificationSettings
+
+    const url = `${backendUrl}/api/admin/dashboard/settings`;
+    console.log('🔗 Updating notification settings at:', url);
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json'
       },
-      timestamp: new Date().toISOString()
+      body: JSON.stringify(body)
     });
-    
+
+    if (!response.ok) {
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Successfully updated notification settings');
+
+    return NextResponse.json(data);
+
   } catch (error) {
-    console.error('❌ Update Notification Settings API error:', error);
+    console.error('Error updating notification settings:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: { 
-          message: error instanceof Error ? error.message : 'Internal server error',
-          details: { statusCode: 500, isOperational: true }
-        },
-        timestamp: new Date().toISOString(),
-        path: '/api/admin/dashboard/settings',
-        method: 'PUT'
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
   }

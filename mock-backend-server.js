@@ -168,7 +168,7 @@ const authenticateToken = (req, res, next) => {
 
   // Mock token validation - accept any token for development
   // In production, this would verify JWT tokens
-  if (token === 'mock-token' || token.startsWith('Bearer mock') || token.length > 10) {
+  if (token === 'mock-token' || token.startsWith('mock') || token.length > 10) {
     next();
   } else {
     return res.status(401).json({
@@ -1527,6 +1527,559 @@ app.get('/api/subroles/categories', authenticateToken, (req, res) => {
   }
 });
 
+// Users endpoints
+let users = [
+  {
+    id: '64f8a1b2c3d4e5f6a7b8c9d0',
+    email: 'admin@newtonbotics.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    studentId: 'ADMIN001',
+    department: 'Computer Science',
+    yearOfStudy: 4,
+    phone: '+1234567890',
+    isActive: true,
+    emailVerified: true,
+    lastLogin: new Date().toISOString(),
+    createdAt: '2023-09-01T08:00:00.000Z',
+    updatedAt: new Date().toISOString(),
+    profileImageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e',
+    bio: 'System administrator for NewtonBotics',
+    skills: ['Management', 'System Administration', 'Project Management'],
+    permissions: ['*'],
+    preferences: {
+      notifications: true,
+      newsletter: true
+    }
+  },
+  {
+    id: '64f8a1b2c3d4e5f6a7b8c9d1',
+    email: 'john.doe@university.edu',
+    firstName: 'John',
+    lastName: 'Doe',
+    role: 'student',
+    studentId: 'STU001',
+    department: 'Computer Science',
+    yearOfStudy: 3,
+    phone: '+1234567891',
+    isActive: true,
+    emailVerified: true,
+    lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: '2023-09-15T08:00:00.000Z',
+    updatedAt: new Date().toISOString(),
+    profileImageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d',
+    bio: 'Computer Science student interested in robotics',
+    skills: ['Python', 'JavaScript', 'Robotics'],
+    permissions: ['project_create', 'project_edit'],
+    preferences: {
+      notifications: true,
+      newsletter: false
+    }
+  },
+  {
+    id: '64f8a1b2c3d4e5f6a7b8c9d2',
+    email: 'jane.smith@university.edu',
+    firstName: 'Jane',
+    lastName: 'Smith',
+    role: 'mentor',
+    studentId: 'MEN001',
+    department: 'Electrical Engineering',
+    yearOfStudy: 5,
+    phone: '+1234567892',
+    isActive: true,
+    emailVerified: true,
+    lastLogin: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: '2023-09-10T08:00:00.000Z',
+    updatedAt: new Date().toISOString(),
+    profileImageUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786',
+    bio: 'Senior researcher and mentor',
+    skills: ['Research', 'Mentoring', 'Electronics', 'Machine Learning'],
+    permissions: ['project_create', 'project_edit', 'mentor_students'],
+    preferences: {
+      notifications: true,
+      newsletter: true
+    }
+  },
+  {
+    id: '64f8a1b2c3d4e5f6a7b8c9d3',
+    email: 'mike.wilson@university.edu',
+    firstName: 'Mike',
+    lastName: 'Wilson',
+    role: 'student',
+    studentId: 'STU002',
+    department: 'Mechanical Engineering',
+    yearOfStudy: 2,
+    phone: '+1234567893',
+    isActive: false,
+    emailVerified: false,
+    lastLogin: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: '2023-10-01T08:00:00.000Z',
+    updatedAt: new Date().toISOString(),
+    profileImageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
+    bio: 'Mechanical engineering student',
+    skills: ['CAD', 'Mechanical Design', '3D Printing'],
+    permissions: ['project_create'],
+    preferences: {
+      notifications: false,
+      newsletter: false
+    }
+  }
+];
+
+// GET /api/users
+app.get('/api/users', authenticateToken, (req, res) => {
+  try {
+    const { page = 1, limit = 20, q, role, department } = req.query;
+    
+    let filteredUsers = [...users];
+
+    // Apply filters
+    if (q) {
+      const searchLower = q.toLowerCase();
+      filteredUsers = filteredUsers.filter(user =>
+        user.firstName.toLowerCase().includes(searchLower) ||
+        user.lastName.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        user.studentId?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (role) {
+      filteredUsers = filteredUsers.filter(user => user.role === role);
+    }
+
+    if (department) {
+      filteredUsers = filteredUsers.filter(user => user.department === department);
+    }
+
+    // Apply pagination
+    const total = filteredUsers.length;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedUsers = filteredUsers.slice(skip, skip + parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        users: paginatedUsers,
+        pagination: {
+          total,
+          limit: parseInt(limit),
+          skip,
+          hasMore: skip + parseInt(limit) < total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/users/statistics
+app.get('/api/users/statistics', authenticateToken, (req, res) => {
+  try {
+    const totalUsers = users.length;
+    const activeUsers = users.filter(user => user.isActive).length;
+    const verifiedUsers = users.filter(user => user.emailVerified).length;
+    
+    // Calculate role distribution
+    const roleDistribution = users.reduce((acc, user) => {
+      const existingRole = acc.find(r => r.role === user.role);
+      if (existingRole) {
+        existingRole.count++;
+      } else {
+        acc.push({ role: user.role, count: 1 });
+      }
+      return acc;
+    }, []);
+
+    res.json({
+      success: true,
+      data: {
+        statistics: {
+          totalUsers,
+          activeUsers,
+          verifiedUsers,
+          roleDistribution
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/users/departments
+app.get('/api/users/departments', authenticateToken, (req, res) => {
+  try {
+    const departments = [...new Set(users.map(user => user.department).filter(Boolean))];
+    
+    res.json({
+      success: true,
+      data: {
+        departments
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/users/roles
+app.get('/api/users/roles', authenticateToken, (req, res) => {
+  try {
+    const roles = [...new Set(users.map(user => user.role))];
+    
+    res.json({
+      success: true,
+      data: {
+        roles
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Dashboard Notifications endpoint
+let notifications = [
+  {
+    _id: 'notif_001',
+    userId: 'admin_user_001',
+    title: 'New Project Request',
+    message: 'A new project request has been submitted',
+    type: 'project_update',
+    priority: 'medium',
+    category: 'info',
+    read: false,
+    readAt: null,
+    archived: false,
+    archivedAt: null,
+    expiresAt: null,
+    delivery: {
+      email: {
+        sent: true,
+        sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        error: null
+      },
+      push: {
+        sent: true,
+        sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        error: null
+      },
+      sms: {
+        sent: false,
+        sentAt: null,
+        error: null
+      },
+      inApp: {
+        delivered: true,
+        deliveredAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      }
+    },
+    relatedEntity: {
+      type: 'project_request',
+      id: 'req_001',
+      title: 'AI Chatbot Development'
+    },
+    action: {
+      type: 'review',
+      url: '/project-requests/req_001',
+      label: 'Review Request'
+    },
+    metadata: {
+      requesterName: 'User',
+      requesterEmail: 'user@university.edu',
+      projectTitle: 'AI Chatbot Development'
+    },
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    timeAgo: '2 hours ago'
+  },
+  {
+    _id: 'notif_002',
+    userId: 'admin_user_001',
+    title: 'System Maintenance',
+    message: 'Scheduled system maintenance will occur tonight',
+    type: 'system',
+    priority: 'high',
+    category: 'warning',
+    read: true,
+    readAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    archived: false,
+    archivedAt: null,
+    expiresAt: null,
+    delivery: {
+      email: {
+        sent: true,
+        sentAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        error: null
+      },
+      push: {
+        sent: true,
+        sentAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        error: null
+      },
+      sms: {
+        sent: true,
+        sentAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        error: null
+      },
+      inApp: {
+        delivered: true,
+        deliveredAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+      }
+    },
+    relatedEntity: {
+      type: 'system',
+      id: 'maint_001',
+      title: 'System Maintenance'
+    },
+    action: {
+      type: 'info',
+      url: '/system/maintenance',
+      label: 'View Details'
+    },
+    metadata: {
+      maintenanceStart: '2024-01-15T02:00:00.000Z',
+      maintenanceEnd: '2024-01-15T06:00:00.000Z',
+      affectedServices: ['API', 'Database', 'File Storage']
+    },
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    timeAgo: '3 hours ago'
+  }
+];
+
+// GET /api/admin/dashboard/notifications
+app.get('/api/admin/dashboard/notifications', authenticateToken, (req, res) => {
+  try {
+    const { limit = 10, skip = 0, type, priority, read } = req.query;
+    
+    let filteredNotifications = [...notifications];
+
+    // Apply filters
+    if (type) {
+      filteredNotifications = filteredNotifications.filter(notif => notif.type === type);
+    }
+
+    if (priority) {
+      filteredNotifications = filteredNotifications.filter(notif => notif.priority === priority);
+    }
+
+    if (read !== undefined) {
+      const isRead = read === 'true';
+      filteredNotifications = filteredNotifications.filter(notif => notif.read === isRead);
+    }
+
+    // Apply pagination
+    const total = filteredNotifications.length;
+    const paginatedNotifications = filteredNotifications.slice(parseInt(skip), parseInt(skip) + parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        notifications: paginatedNotifications,
+        pagination: {
+          total,
+          limit: parseInt(limit),
+          skip: parseInt(skip),
+          hasMore: parseInt(skip) + parseInt(limit) < total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// PUT /api/admin/dashboard/notifications/read-all
+app.put('/api/admin/dashboard/notifications/read-all', authenticateToken, (req, res) => {
+  try {
+    let markedCount = 0;
+    notifications.forEach(notification => {
+      if (!notification.read) {
+        notification.read = true;
+        notification.readAt = new Date().toISOString();
+        notification.updatedAt = new Date().toISOString();
+        markedCount++;
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Marked ${markedCount} notifications as read`,
+      data: {
+        markedCount,
+        totalNotifications: notifications.length
+      }
+    });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// PUT /api/admin/dashboard/notifications/:id/read
+app.put('/api/admin/dashboard/notifications/:id/read', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const notificationIndex = notifications.findIndex(notif => notif._id === id);
+    
+    if (notificationIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+    
+    // Mark as read
+    notifications[notificationIndex].read = true;
+    notifications[notificationIndex].readAt = new Date().toISOString();
+    notifications[notificationIndex].updatedAt = new Date().toISOString();
+    
+    res.json({
+      success: true,
+      message: 'Notification marked as read',
+      data: {
+        notification: notifications[notificationIndex]
+      }
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Dashboard Settings endpoint
+let notificationSettings = {
+  email: {
+    enabled: true,
+    projectRequests: true,
+    events: true,
+    news: true,
+    equipment: true,
+    system: true,
+    frequency: 'immediate'
+  },
+  push: {
+    enabled: true,
+    projectRequests: true,
+    events: true,
+    news: false,
+    equipment: true,
+    system: true,
+    frequency: 'immediate'
+  },
+  sms: {
+    enabled: false,
+    projectRequests: false,
+    events: true,
+    news: false,
+    equipment: false,
+    system: true,
+    frequency: 'daily'
+  },
+  inApp: {
+    enabled: true,
+    projectRequests: true,
+    events: true,
+    news: true,
+    equipment: true,
+    system: true,
+    frequency: 'immediate'
+  },
+  frequency: {
+    immediate: true,
+    daily: false,
+    weekly: false,
+    monthly: false
+  },
+  quietHours: {
+    enabled: true,
+    start: '22:00',
+    end: '08:00',
+    timezone: 'UTC'
+  },
+  admin: {
+    receiveAllNotifications: true,
+    notificationDigest: 'daily',
+    systemAlerts: true,
+    userActivityAlerts: true
+  }
+};
+
+// GET /api/admin/dashboard/settings
+app.get('/api/admin/dashboard/settings', authenticateToken, (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        settings: notificationSettings
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching notification settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// PUT /api/admin/dashboard/settings
+app.put('/api/admin/dashboard/settings', authenticateToken, (req, res) => {
+  try {
+    const body = req.body;
+    
+    // Update the settings
+    Object.assign(notificationSettings, body);
+    
+    res.json({
+      success: true,
+      message: 'Notification settings updated successfully',
+      data: {
+        settings: notificationSettings
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -1563,6 +2116,12 @@ app.listen(PORT, () => {
   console.log('Dashboard:');
   console.log('- GET  /api/admin/dashboard/summary');
   console.log('- GET  /api/admin/dashboard/notifications');
+  console.log('Users:');
+  console.log('- GET  /api/users');
+  console.log('- POST /api/users');
+  console.log('- GET  /api/users/statistics');
+  console.log('- GET  /api/users/departments');
+  console.log('- GET  /api/users/roles');
   console.log('Subroles:');
   console.log('- GET  /api/subroles');
   console.log('- POST /api/subroles');
