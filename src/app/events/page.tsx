@@ -356,13 +356,16 @@ export default function EventsPage() {
                                   console.log('Image failed to load:', event.imageUrl);
                                   console.log('Trying fallback URL...');
                                   // Try original URL as fallback
-                                  if (e.currentTarget.src !== event.imageUrl) {
+                                  if (event.imageUrl && e.currentTarget.src !== event.imageUrl) {
                                     e.currentTarget.src = event.imageUrl;
                                     return;
                                   }
                                   // If still fails, show fallback icon
                                   e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                  const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (nextElement) {
+                                    nextElement.style.display = 'flex';
+                                  }
                                 }}
                               />
                             ) : null}
