@@ -612,7 +612,7 @@ export default function EditEventPage() {
                           console.log('Current image failed to load:', formData.imageUrl);
                           console.log('Trying fallback URL...');
                           // Try original URL as fallback
-                          if (e.currentTarget.src !== formData.imageUrl) {
+                          if (formData.imageUrl && e.currentTarget.src !== formData.imageUrl) {
                             e.currentTarget.src = formData.imageUrl;
                             return;
                           }
