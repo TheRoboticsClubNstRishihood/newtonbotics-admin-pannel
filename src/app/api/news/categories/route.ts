@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +15,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/news/categories`, {
       headers: {
         'Authorization': authHeader,
@@ -58,7 +60,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/news/categories`, {
       method: 'POST',
       headers: {

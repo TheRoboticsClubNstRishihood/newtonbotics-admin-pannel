@@ -199,31 +199,31 @@ export default function Dashboard() {
         {/* Dashboard Overview */}
         {dashboardData && (
           <>
-            <DashboardOverviewComponent overview={dashboardData.overview} />
+            <DashboardOverviewComponent overview={dashboardData?.overview} />
 
             {/* Charts Section */}
-            {dashboardData.charts ? (
+            {dashboardData?.charts ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Chart
-                  data={dashboardData.charts.userGrowth || []}
+                  data={dashboardData?.charts?.userGrowth || []}
                   title="User Growth"
                   type="line"
                   height={300}
                 />
                 <Chart
-                  data={dashboardData.charts.projectActivity || []}
+                  data={dashboardData?.charts?.projectActivity || []}
                   title="Project Activity"
                   type="bar"
                   height={300}
                 />
                 <Chart
-                  data={dashboardData.charts.equipmentUtilization || []}
+                  data={dashboardData?.charts?.equipmentUtilization || []}
                   title="Equipment Utilization"
                   type="equipment"
                   height={300}
                 />
                 <Chart
-                  data={dashboardData.charts.requestTrends || []}
+                  data={dashboardData?.charts?.requestTrends || []}
                   title="Request Trends"
                   type="line"
                   height={300}
@@ -252,7 +252,7 @@ export default function Dashboard() {
 
             {/* Status Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(dashboardData.statusBreakdown).map(([key, statuses]) => (
+              {dashboardData?.statusBreakdown && Object.entries(dashboardData.statusBreakdown).map(([key, statuses]) => (
                 <div key={key} className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4 capitalize">
                     {key} Status
@@ -275,7 +275,7 @@ export default function Dashboard() {
                 {
                   id: '1',
                   type: 'user',
-                  title: `${dashboardData.recentActivity.newUsers} new users registered`,
+                  title: `${dashboardData?.recentActivity?.newUsers || 0} new users registered`,
                   timestamp: new Date().toISOString(),
                   user: 'System',
                   icon: UsersIcon
@@ -283,7 +283,7 @@ export default function Dashboard() {
                 {
                   id: '2',
                   type: 'project',
-                  title: `${dashboardData.recentActivity.newProjects} new projects created`,
+                  title: `${dashboardData?.recentActivity?.newProjects || 0} new projects created`,
                   timestamp: new Date().toISOString(),
                   user: 'System',
                   icon: DocumentTextIcon
@@ -291,7 +291,7 @@ export default function Dashboard() {
                 {
                   id: '3',
                   type: 'request',
-                  title: `${dashboardData.recentActivity.newRequests} new requests submitted`,
+                  title: `${dashboardData?.recentActivity?.newRequests || 0} new requests submitted`,
                   timestamp: new Date().toISOString(),
                   user: 'System',
                   icon: ExclamationTriangleIcon
@@ -299,7 +299,7 @@ export default function Dashboard() {
                 {
                   id: '4',
                   type: 'workshop',
-                  title: `${dashboardData.recentActivity.newWorkshops} new workshops scheduled`,
+                  title: `${dashboardData?.recentActivity?.newWorkshops || 0} new workshops scheduled`,
                   timestamp: new Date().toISOString(),
                   user: 'System',
                   icon: AcademicCapIcon
@@ -307,7 +307,7 @@ export default function Dashboard() {
                 {
                   id: '5',
                   type: 'news',
-                  title: `${dashboardData.recentActivity.newNews} new news articles published`,
+                  title: `${dashboardData?.recentActivity?.newNews || 0} new news articles published`,
                   timestamp: new Date().toISOString(),
                   user: 'System',
                   icon: NewspaperIcon

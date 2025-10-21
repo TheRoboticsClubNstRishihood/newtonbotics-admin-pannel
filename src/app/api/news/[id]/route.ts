@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +18,6 @@ export async function GET(
     }
 
     // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
     const resolvedParams = await params;
     const response = await fetch(`${backendUrl}/api/news/${resolvedParams.id}`, {
       method: 'GET',
@@ -71,7 +73,6 @@ export async function PUT(
     console.log('API Route - Received body:', body);
 
     // Make request to your backend API using the admin endpoint
-    const backendUrl = 'http://localhost:3005';
     const resolvedParams = await params;
     console.log('API Route - Backend URL:', backendUrl);
     console.log('API Route - Article ID:', resolvedParams.id);
@@ -130,7 +131,6 @@ export async function DELETE(
     }
 
     // Make request to your backend API
-    const backendUrl = 'http://localhost:3005';
     const resolvedParams = await params;
     const response = await fetch(`${backendUrl}/api/news/${resolvedParams.id}`, {
       method: 'DELETE',

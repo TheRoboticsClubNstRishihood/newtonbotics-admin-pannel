@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +36,6 @@ export async function GET(request: NextRequest) {
     if (search) queryParams.append('search', search);
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/contact/submissions?${queryParams}`, {
       headers: {
         'Authorization': authHeader,

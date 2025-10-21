@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from '@/config/backend';
+
+const backendUrl = getBackendUrl();
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +19,6 @@ export async function GET(
     }
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/contact/submissions/${id}`, {
       headers: {
         'Authorization': authHeader,
@@ -64,7 +66,6 @@ export async function PUT(
     }
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/contact/submissions/${id}`, {
       method: 'PUT',
       headers: {
@@ -113,7 +114,6 @@ export async function DELETE(
     }
 
     // Make request to your backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3005';
     const response = await fetch(`${backendUrl}/api/contact/submissions/${id}`, {
       method: 'DELETE',
       headers: {
