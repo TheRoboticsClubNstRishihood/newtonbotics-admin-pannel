@@ -795,20 +795,43 @@ export default function MediaPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-16 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-                          {item.thumbnailUrl ? (
-                            item.fileType === 'video' ? (
-                              <video
-                                src={item.fileUrl}
-                                className="h-10 w-16 object-cover rounded"
-                                muted
-                                preload="metadata"
-                              />
-                            ) : (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={item.thumbnailUrl} alt={item.title} className="h-10 w-16 object-cover"/>
-                            )
+                          {item.fileType === 'video' ? (
+                            <video
+                              src={item.fileUrl}
+                              className="h-10 w-16 object-cover rounded"
+                              muted
+                              preload="metadata"
+                            />
                           ) : (
-                            iconForType(item.fileType)
+                            (item.thumbnailUrl || item.fileUrl) ? (
+                              <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={(item.thumbnailUrl || item.fileUrl).includes('cloudinary.com')
+                                    ? (item.thumbnailUrl || item.fileUrl).replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
+                                    : (item.thumbnailUrl || item.fileUrl)}
+                                  alt={item.title}
+                                  className="h-10 w-16 object-cover"
+                                  onError={(e) => {
+                                    // Try the original URL once if we attempted a transformed one
+                                    if ((item.thumbnailUrl || item.fileUrl) && e.currentTarget.src !== (item.thumbnailUrl || item.fileUrl)) {
+                                      e.currentTarget.src = (item.thumbnailUrl || item.fileUrl) as string;
+                                      return;
+                                    }
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                                <div className="h-10 w-16 items-center justify-center hidden" style={{ display: 'none' }}>
+                                  {iconForType('image')}
+                                </div>
+                              </>
+                            ) : (
+                              iconForType(item.fileType)
+                            )
                           )}
                         </div>
                         <div>
