@@ -33,6 +33,22 @@ const docSections: DocSection[] = [
 ## Overview
 The NewtonBotics Admin Panel frontend is built using Next.js 15 with React and TypeScript.
 
+# NEXT_PUBLIC_API_URL = https://newton-botics-servers-chi.vercel.app/api
+# NEXT_PUBLIC_API_URL = http://localhost:3005/api
+NEXT_PUBLIC_API_URL=https://newton-botics-server-phi.vercel.app/api
+
+# Backend API Configuration
+# NEXT_PUBLIC_API_URL=https://newton-botics-server-phi.vercel.app/api
+
+
+# Cloudinary Configuration
+# roboticsclub
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dp6dncpvi
+NEXT_PUBLIC_CLOUDINARY_API_KEY=893416931771931
+CLOUDINARY_API_SECRET=cDdkroRUgCdrWhymggo_yVHPL8g
+MIGRATION_SECRET=choose-a-strong-secret
+NEXT_PUBLIC_MIGRATION_SECRET=choose-a-strong-secret
+
 ## Key Technologies
 - **Next.js 15**: React framework with App Router
 - **TypeScript**: Type-safe JavaScript
@@ -76,6 +92,44 @@ src/
 
 ## Overview
 The NewtonBotics backend provides RESTful APIs for the admin panel and other services.
+
+NODE_ENV=development
+PORT=3005
+HOST=localhost
+
+
+# MONGODB_URI=mongodb+srv://monuk23csai:UIjxnDiIU2GbCJVp@cluster0.gwdkg.mongodb.net/roboticsLab?retryWrites=true&w=majority&appName=Cluster0
+
+
+JWT_SECRET=change-this-strong-secret
+JWT_EXPIRES_IN=24h
+JWT_REFRESH_EXPIRES_IN=7d
+
+REDIS_ENABLED=false
+CORS_ORIGIN=http://localhost:3000,http://localhost:3003,http://localhost:3005,http://localhost:3002,http://localhost:3001
+LOG_LEVEL=info
+
+
+
+BCRYPT_ROUNDS=12
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+AUTH_RATE_LIMIT_WINDOW_MS=900000
+AUTH_RATE_LIMIT_MAX_REQUESTS=5
+AUTH_RATE_LIMIT_RETRY_AFTER=15
+DISABLE_AUTH_RATE_LIMIT=false
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=robotics.club@rishihood.edu.in
+SMTP_PASS=kfup fmue dzjf fxln
+EMAIL_FROM=robotics.club@rishihood.edu.in
+APP_BASE_URL=http://localhost:3000
+ADMIN_NOTIFY_EMAIL=admin@newtonbotics.com
+MONGODB_URI=mongodb+srv://robotics:PasswordRoboticsLab@newtonroboticslab.u5sgpmb.mongodb.net/?retryWrites=true&w=majority&appName=NewtonRoboticsLab
+
 
 ## Architecture
 - **Node.js**: Runtime environment
@@ -139,6 +193,25 @@ The NewtonBotics backend provides RESTful APIs for the admin panel and other ser
 
 ## Overview
 The NewtonBotics Admin Panel provides comprehensive management tools for administrators.
+
+
+
+# Development Backend URL (local server)
+# NEXT_PUBLIC_BACKEND_URL=http://localhost:3006
+# BACKEND_URL=http://localhost:3006
+
+# Production Backend URL (uncomment when deploying)
+NEXT_PUBLIC_BACKEND_URL=https://newton-botics-servers-chi.vercel.app
+BACKEND_URL=https://newton-botics-servers-chi.vercel.app
+
+# Cloudinary Configuration
+# roboticsclub
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dp6dncpvi
+NEXT_PUBLIC_CLOUDINARY_API_KEY=893416931771931
+CLOUDINARY_API_SECRET=cDdkroRUgCdrWhymggo_yVHPL8g
+MIGRATION_SECRET=choose-a-strong-secret
+NEXT_PUBLIC_MIGRATION_SECRET=choose-a-strong-secret
+
 
 ## Features
 
