@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import AdminLayout from '../../../../components/AdminLayout';
 import { useToast } from '../../../../components/ToastContext';
 import CloudinaryUploader from '../../../../components/CloudinaryUploader';
+import Image from 'next/image';
 
 interface Event {
   _id: string;
@@ -168,7 +169,7 @@ export default function EditEventPage() {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          showError('Your session expired for security reasons. Please log in again.');
+          showError('Your session has expired for security reasons. Please log in again to continue.');
           router.push('/');
           return;
         }
@@ -356,7 +357,7 @@ export default function EditEventPage() {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          showError('Your session expired for security reasons. Please log in again.');
+          showError('Your session has expired for security reasons. Please log in again to continue.');
           router.push('/');
           return;
         }
@@ -602,11 +603,13 @@ export default function EditEventPage() {
                   <div className="mb-4">
                     <p className="text-sm font-medium text-black mb-2">Current Image:</p>
                     <div className="relative">
-                      <img
+                      <Image
                         src={formData.imageUrl.includes('cloudinary.com') 
                           ? formData.imageUrl.replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
                           : formData.imageUrl}
                         alt="Current event image"
+                        width={240}
+                        height={160}
                         className="w-64 h-40 object-cover rounded-lg border"
                         onError={(e) => {
                           console.log('Current image failed to load:', formData.imageUrl);

@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
 import { useToast } from '../../components/ToastContext';
+import Image from 'next/image';
 
 interface Event {
   _id: string;
@@ -346,11 +347,13 @@ export default function EventsPage() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12">
                             {event.imageUrl ? (
-                              <img
+                              <Image
                                 src={event.imageUrl.includes('cloudinary.com') 
                                   ? event.imageUrl.replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
                                   : event.imageUrl}
                                 alt={event.title}
+                                width={48}
+                                height={48}
                                 className="h-12 w-12 rounded-lg object-cover"
                                 onError={(e) => {
                                   console.log('Image failed to load:', event.imageUrl);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   CalendarIcon,
@@ -51,7 +51,7 @@ export default function Dashboard() {
   });
 
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = async () => {
     const token = localStorage.getItem('accessToken');
     const userData = localStorage.getItem('user');
     
@@ -90,6 +90,7 @@ export default function Dashboard() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
+        // Optionally, show a message here if a toast or setError is present (see if you have a showError etc.) before redirect
         router.push('/');
       }
     } catch (error) {
@@ -109,12 +110,13 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  };
 
   // Check authentication on page load
   useEffect(() => {
     checkAuth();
-  }, [checkAuth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle period change
   const handlePeriodChange = (period: DashboardPeriod) => {

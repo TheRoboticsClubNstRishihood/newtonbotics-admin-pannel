@@ -74,20 +74,6 @@ interface NewsArticle {
   };
 }
 
-interface NewsFormData {
-  title: string;
-  content: string;
-  authorId: string;
-  categoryId: string;
-  isPublished: boolean;
-  featureOptions: {
-    showInNav: boolean;
-    navOrder: number;
-    featuredImage: string;
-  };
-  tags: string[];
-}
-
 export default function News() {
   const router = useRouter();
   const { showSuccess, showError } = useToast();

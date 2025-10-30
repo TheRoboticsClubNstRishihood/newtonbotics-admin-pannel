@@ -31,6 +31,13 @@ export default function CreateProjectPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const formatUserLabel = (u: Partial<User>) => {
+    const first = typeof u.firstName === 'string' ? u.firstName : '';
+    const last = typeof u.lastName === 'string' ? u.lastName : '';
+    const email = typeof u.email === 'string' ? u.email : '';
+    const name = `${first} ${last}`.trim();
+    return name || email || String(u.id || '');
+  };
   const [teamMembers, setTeamMembers] = useState<Array<{
     userId: string;
     role: string;
@@ -259,37 +266,133 @@ export default function CreateProjectPage() {
       const data = await response.json();
 
       if (data.success) {
-        const projectId = data.data.id;
+        // Try multiple response shapes to get the project id
+        const projectId = (data?.data?.id)
+          || (data?.data?.project?.id)
+          || (data?.id)
+          || (data?.project?.id);
+
+        if (!projectId) {
+          console.error('Project created but ID not found in response:', data);
+          alert('Project created, but could not determine project ID from response. Please add team members from the project details page.');
+          router.push('/projects');
+          return;
+        }
         
         // Add team members if any were specified
         const membersToAdd = teamMembers.filter(member => member.userId && member.role);
         
         if (membersToAdd.length > 0) {
-          // Add each team member
+          console.log(`Adding ${membersToAdd.length} team members to project ${projectId}`);
+          
+          // Add each team member and wait for confirmation
+          const memberResults = [];
           for (const member of membersToAdd) {
-            const memberData = {
-              userId: member.userId,
+            const idToUse = String(member.userId || '').trim();
+            const looksLikeObjectId = /^[a-fA-F0-9]{24}$/.test(idToUse);
+            const selectedUser = users.find(u => u.id === idToUse);
+            if (!idToUse || !looksLikeObjectId || !selectedUser) {
+              console.warn('Skipping invalid team member userId', { idToUse, looksLikeObjectId, hasSelectedUser: !!selectedUser });
+              alert('Please select a valid user for each team member before submitting.');
+              continue;
+            }
+            const computedFirst = selectedUser?.firstName || undefined;
+            const computedLast = selectedUser?.lastName || undefined;
+            const computedName = [computedFirst, computedLast].filter(Boolean).join(' ') || undefined;
+            const memberData: {
+              userId: string;
+              role: string;
+              name?: string;
+              userName?: string;
+              firstName?: string;
+              lastName?: string;
+              skills?: string[];
+              responsibilities?: string[];
+              timeCommitment?: { hoursPerWeek: number };
+              contribution?: string;
+            } = {
+              userId: idToUse,
               role: member.role,
-              skills: member.skills ? member.skills.split(',').map(s => s.trim()) : undefined,
-              responsibilities: member.responsibilities ? member.responsibilities.split(',').map(r => r.trim()) : undefined,
-              timeCommitment: member.hoursPerWeek ? {
-                hoursPerWeek: parseInt(member.hoursPerWeek)
-              } : undefined,
-              contribution: member.contribution || undefined
+              name: computedName,
+              userName: computedName,
+              firstName: computedFirst,
+              lastName: computedLast
             };
 
-            const memberResponse = await fetch(`/api/projects/${projectId}/members`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(memberData)
-            });
-
-            if (!memberResponse.ok) {
-              console.error('Failed to add team member:', member.userId);
+            // Only add optional fields if they have values
+            if (member.skills) {
+              const skillsArray = member.skills.split(',').map(s => s.trim()).filter(s => s);
+              if (skillsArray.length > 0) {
+                memberData.skills = skillsArray;
+              }
             }
+
+            if (member.responsibilities) {
+              const respArray = member.responsibilities.split(',').map(r => r.trim()).filter(r => r);
+              if (respArray.length > 0) {
+                memberData.responsibilities = respArray;
+              }
+            }
+
+            if (member.hoursPerWeek) {
+              memberData.timeCommitment = {
+                hoursPerWeek: parseInt(member.hoursPerWeek)
+              };
+            }
+
+            if (member.contribution) {
+              memberData.contribution = member.contribution;
+            }
+
+            try {
+              const memberResponse = await fetch(`/api/projects/${projectId}/members`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(memberData)
+              });
+
+              const memberResult = await memberResponse.json();
+              
+              if (memberResponse.ok && memberResult.success) {
+                console.log(`Successfully added team member: ${member.userId}`);
+                memberResults.push({ success: true, userId: member.userId });
+              } else {
+                console.error('Failed to add team member:', member.userId, memberResult);
+                memberResults.push({ 
+                  success: false, 
+                  userId: member.userId, 
+                  error: memberResult.message || 'Unknown error' 
+                });
+              }
+            } catch (error) {
+              console.error('Error adding team member:', member.userId, error);
+              memberResults.push({ 
+                success: false, 
+                userId: member.userId, 
+                error: error instanceof Error ? error.message : 'Network error' 
+              });
+            }
+          }
+
+          // Check if any members failed to add
+          const failedMembers = memberResults.filter(r => !r.success);
+          if (failedMembers.length > 0) {
+            console.warn(`${failedMembers.length} team member(s) failed to add:`, failedMembers);
+            const successCount = memberResults.length - failedMembers.length;
+            // Build readable details for failures
+            const details = failedMembers
+              .map(f => {
+                const u = users.find(x => x.id === f.userId);
+                const name = u ? `${u.firstName} ${u.lastName} (${u.email})` : f.userId;
+                return `- ${name}: ${f.error || 'Unknown error'}`;
+              })
+              .join('\n');
+            alert(`Project created successfully, but ${failedMembers.length} team member(s) failed to add. ${successCount} member(s) were added successfully.\n\nDetails:\n${details}\n\nYou can add the remaining members from the project details page.`);
+          } else {
+            console.log(`All ${memberResults.length} team member(s) added successfully`);
           }
         }
         
@@ -339,7 +442,7 @@ export default function CreateProjectPage() {
   const teamLeaders = users.filter(user => 
     user.role === 'team_leader' || 
     user.role === 'admin' || 
-    user.role === 'member'
+    user.role === 'team_member'
   );
 
   return (
@@ -413,9 +516,26 @@ export default function CreateProjectPage() {
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
+                    list="categoryOptions"
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="e.g., Robotics, AI, Web Development"
                   />
+                  <datalist id="categoryOptions">
+                    <option value="Robotics" />
+                    <option value="Artificial Intelligence" />
+                    <option value="Machine Learning" />
+                    <option value="Computer Vision" />
+                    <option value="Web Development" />
+                    <option value="Frontend" />
+                    <option value="Backend" />
+                    <option value="Mobile App" />
+                    <option value="IoT" />
+                    <option value="Embedded Systems" />
+                    <option value="Automation" />
+                    <option value="Electronics" />
+                    <option value="Data Science" />
+                    <option value="DevOps" />
+                  </datalist>
                 </div>
 
                 <div>
@@ -569,8 +689,8 @@ export default function CreateProjectPage() {
                 >
                   <option value="">Select Team Leader</option>
                   {teamLeaders.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} ({user.email})
+                    <option key={String(user.id)} value={String(user.id)}>
+                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
                     </option>
                   ))}
                 </select>
@@ -589,8 +709,8 @@ export default function CreateProjectPage() {
                 >
                   <option value="">Select Mentor (Optional)</option>
                   {mentors.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} ({user.email})
+                    <option key={String(user.id)} value={String(user.id)}>
+                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
                     </option>
                   ))}
                 </select>
@@ -632,8 +752,8 @@ export default function CreateProjectPage() {
                         >
                           <option value="">Select User</option>
                           {users.map(user => (
-                            <option key={user.id} value={user.id}>
-                              {user.firstName} {user.lastName} ({user.email})
+                            <option key={String(user.id)} value={String(user.id)}>
+                              {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
                             </option>
                           ))}
                         </select>

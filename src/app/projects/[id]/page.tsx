@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
-import TeamMemberModal from '@/components/TeamMemberModal';
-import MilestoneModal from '@/components/MilestoneModal';
 import TeamAnalytics from '@/components/TeamAnalytics';
 import { 
   ArrowLeftIcon,
@@ -19,8 +17,7 @@ import {
   CodeBracketIcon,
   DocumentTextIcon,
   TrophyIcon,
-  HashtagIcon,
-  PlusIcon
+  HashtagIcon
 } from '@heroicons/react/24/outline';
 
 interface Project {
@@ -346,9 +343,10 @@ export default function ProjectDetailsPage() {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-md"
+              className="flex items-center p-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-md shadow-sm"
             >
               <ArrowLeftIcon className="w-5 h-5" />
+              <span className="ml-2 font-medium">Back</span>
             </button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{project.title || 'Untitled Project'}</h1>
@@ -463,12 +461,31 @@ export default function ProjectDetailsPage() {
                 {project.teamMembers && project.teamMembers.length > 0 ? (
                   <div className="space-y-4">
                     {project.teamMembers.map((member, index) => {
-                      const unknownMember = member as unknown as { user?: { id?: string; _id?: string; firstName?: string; lastName?: string }; userId?: string; name?: string; firstName?: string; lastName?: string; role?: string; id?: string };
-                      const user = unknownMember.user || ({ id: unknownMember.userId } as { id?: string; _id?: string; firstName?: string; lastName?: string });
-                      const nameFromName = unknownMember.name ? String(unknownMember.name) : '';
-                      const firstName = unknownMember.firstName || user?.firstName || (nameFromName ? nameFromName.split(' ')[0] : '');
-                      const lastName = unknownMember.lastName || user?.lastName || (nameFromName ? nameFromName.split(' ').slice(1).join(' ') : '');
-                      const initials = `${(firstName?.charAt?.(0) || '').toUpperCase()}${(lastName?.charAt?.(0) || '').toUpperCase()}` || 'TM';
+                      const unknownMember = member as unknown as { user?: { id?: string; _id?: string; firstName?: string; lastName?: string; fullName?: string; displayName?: string }; userId?: string; name?: string; firstName?: string; lastName?: string; role?: string; id?: string };
+                      const user = unknownMember.user || ({ id: unknownMember.userId } as { id?: string; _id?: string; firstName?: string; lastName?: string; fullName?: string; displayName?: string });
+                      const candidates: string[] = [];
+                      // Preferred: explicit first/last
+                      if (unknownMember.firstName || unknownMember.lastName) {
+                        candidates.push(`${unknownMember.firstName || ''} ${unknownMember.lastName || ''}`.trim());
+                      }
+                      if (user?.firstName || user?.lastName) {
+                        candidates.push(`${user.firstName || ''} ${user.lastName || ''}`.trim());
+                      }
+                      // Provided composite names
+                      if (unknownMember.name) candidates.push(String(unknownMember.name));
+                      if (user?.fullName) candidates.push(String(user.fullName));
+                      if (user?.displayName) candidates.push(String(user.displayName));
+                      // Fallback from allTeamMembers by userId
+                      const lookupId = (user?.id || user?._id || unknownMember.userId) as string | undefined;
+                      if (lookupId && project.allTeamMembers) {
+                        const match = project.allTeamMembers.find(m => m.userId === lookupId);
+                        if (match?.name) candidates.push(String(match.name));
+                      }
+                      const displayName = (candidates.find(n => !!n && n.trim().length > 0) || '').trim();
+                      const parts = displayName.split(' ').filter(Boolean);
+                      const firstName = parts[0] || '';
+                      const lastName = parts.slice(1).join(' ');
+                      const initials = `${(firstName.charAt(0) || '').toUpperCase()}${(lastName.charAt(0) || '').toUpperCase()}` || 'TM';
                       const key = unknownMember.id || user?.id || user?._id || unknownMember.userId || `member-${index}`;
                       return (
                         <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -559,7 +576,35 @@ export default function ProjectDetailsPage() {
               <div className="px-6 py-4">
                 {project.milestones && project.milestones.length > 0 ? (
                   <div className="space-y-4">
-                    {project.milestones.map((milestone) => (
+                    {project.milestones.map((milestone) => {
+                      // Compute assignee display name from various shapes
+                      const assignedRaw = milestone.assignedTo as unknown;
+                      const assignedObj = (typeof assignedRaw === 'object' && assignedRaw !== null ? assignedRaw : undefined) as
+                        | { id?: string; _id?: string; firstName?: string; lastName?: string; name?: string; fullName?: string; displayName?: string }
+                        | undefined;
+                      const assignedId = (
+                        typeof assignedRaw === 'string'
+                          ? assignedRaw
+                          : (assignedObj?.id || (assignedObj as { _id?: string })?._id)
+                      ) as string | undefined;
+                      const nameCandidates: string[] = [];
+                      if (assignedObj?.firstName || assignedObj?.lastName) {
+                        nameCandidates.push(`${assignedObj.firstName || ''} ${assignedObj.lastName || ''}`.trim());
+                      }
+                      if ((assignedObj as { name?: string })?.name) nameCandidates.push(String((assignedObj as { name?: string }).name));
+                      if ((assignedObj as { fullName?: string })?.fullName) nameCandidates.push(String((assignedObj as { fullName?: string }).fullName));
+                      if ((assignedObj as { displayName?: string })?.displayName) nameCandidates.push(String((assignedObj as { displayName?: string }).displayName));
+                      if (assignedId && project.allTeamMembers) {
+                        const match = project.allTeamMembers.find(m => m.userId === assignedId);
+                        if (match?.name) nameCandidates.push(match.name);
+                      }
+                      if (assignedId && project.teamMembers) {
+                        const match = project.teamMembers.find(m => m.id === assignedId);
+                        if (match) nameCandidates.push(`${match.firstName || ''} ${match.lastName || ''}`.trim());
+                      }
+                      const assigneeName = (nameCandidates.find(n => n && n.trim().length > 0) || '').trim();
+
+                      return (
                       <div key={milestone.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="text-sm font-medium text-gray-900">{milestone.title}</h4>
@@ -575,12 +620,13 @@ export default function ProjectDetailsPage() {
                             <CalendarIcon className="w-4 h-4 mr-1" />
                             <span>Due: {formatDate(milestone.dueDate)}</span>
                           </div>
-                          {milestone.assignedTo && (
-                            <span>Assigned to: {milestone.assignedTo.firstName} {milestone.assignedTo.lastName}</span>
+                          {(assigneeName || milestone.assignedTo) && (
+                            <span>Assigned to: {assigneeName || 'Unassigned'}</span>
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-gray-500 text-center py-4">No milestones defined</p>
