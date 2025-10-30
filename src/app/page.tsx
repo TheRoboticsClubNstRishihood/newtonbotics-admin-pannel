@@ -23,6 +23,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState('');
 
   // Check authentication on page load
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function Home() {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setIsAuthenticated(false);
+        setError('Your session has expired for security reasons. Please log in again to continue.');
       }
     } catch (error) {
       console.error('Auth check failed:', error);

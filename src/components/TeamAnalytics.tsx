@@ -152,8 +152,8 @@ export default function TeamAnalytics({ allTeamMembers }: TeamAnalyticsProps) {
             {allTeamMembers
               .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
               .slice(0, 5)
-              .map((member) => (
-                <div key={member.userId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              .map((member, idx) => (
+                <div key={`${member.userId}-${member.joinedAt}-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       member.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -199,8 +199,8 @@ export default function TeamAnalytics({ allTeamMembers }: TeamAnalyticsProps) {
                 })
                 .sort((a, b) => b.tenureDays - a.tenureDays)
                 .slice(0, 5)
-                .map((member) => (
-                  <div key={member.userId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                .map((member, idx) => (
+                  <div key={`${member.userId}-${member.joinedAt}-${idx}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 bg-green-100 text-green-800 rounded-full flex items-center justify-center">
                         <span className="text-xs font-medium">

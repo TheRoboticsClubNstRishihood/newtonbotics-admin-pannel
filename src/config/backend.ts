@@ -6,26 +6,40 @@ export const BACKEND_CONFIG = {
   // Development backend URL (your local backend)
   DEVELOPMENT_URL: 'http://localhost:3006',
   
+  // Normalize URL to avoid duplicated path segments like /api/api
+  normalizeBaseUrl(url: string): string {
+    try {
+      // Remove any trailing '/api' (with or without trailing slash)
+      return url.replace(/\/api\/?$/, '');
+    } catch {
+      return url;
+    }
+  },
+
   // Get the appropriate backend URL based on environment
   getBackendUrl(): string {
     // Check for environment variables first
     if (typeof window !== 'undefined') {
       // Client-side: use NEXT_PUBLIC_ environment variables
-      return process.env.NEXT_PUBLIC_BACKEND_URL || this.DEVELOPMENT_URL;
+      const raw = process.env.NEXT_PUBLIC_BACKEND_URL || this.DEVELOPMENT_URL;
+      return this.normalizeBaseUrl(raw);
     } else {
       // Server-side: prefer NEXT_PUBLIC_BACKEND_URL (single source of truth), then BACKEND_URL, then dev defaults
-      return process.env.NEXT_PUBLIC_BACKEND_URL 
+      const raw = process.env.NEXT_PUBLIC_BACKEND_URL 
         || process.env.BACKEND_URL 
         || this.DEVELOPMENT_URL;
+      return this.normalizeBaseUrl(raw);
     }
   },
   
   // Get development URL for testing/mock data
   getDevBackendUrl(): string {
     if (typeof window !== 'undefined') {
-      return process.env.NEXT_PUBLIC_BACKEND_URL || this.DEVELOPMENT_URL;
+      const raw = process.env.NEXT_PUBLIC_BACKEND_URL || this.DEVELOPMENT_URL;
+      return this.normalizeBaseUrl(raw);
     } else {
-      return process.env.DEV_BACKEND_URL || this.DEVELOPMENT_URL;
+      const raw = process.env.DEV_BACKEND_URL || this.DEVELOPMENT_URL;
+      return this.normalizeBaseUrl(raw);
     }
   }
 };

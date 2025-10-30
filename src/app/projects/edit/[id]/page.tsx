@@ -43,6 +43,17 @@ interface Project {
   tags?: string[];
 }
 
+interface Milestone {
+  id?: string;
+  _id?: string;
+  title: string;
+  description?: string;
+  dueDate: string; // ISO date
+  status?: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  assignedTo?: string;
+  completedAt?: string;
+}
+
 export default function EditProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -50,6 +61,91 @@ export default function EditProjectPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [project, setProject] = useState<Project | null>(null);
+  const [existingMembers, setExistingMembers] = useState<Array<{
+    id?: string;
+    userId?: string;
+    user?: { id?: string; firstName?: string; lastName?: string; email?: string };
+    role?: string;
+    skills?: string[];
+    responsibilities?: string[];
+    timeCommitment?: { hoursPerWeek?: number };
+    hoursPerWeek?: number;
+    contribution?: string;
+  }>>([]);
+
+  const formatUserLabel = (u: Partial<User>) => {
+    const first = typeof u.firstName === 'string' ? u.firstName : '';
+    const last = typeof u.lastName === 'string' ? u.lastName : '';
+    const email = typeof u.email === 'string' ? u.email : '';
+    const name = `${first} ${last}`.trim();
+    return name || email || String((u as { id?: string }).id || '');
+  };
+
+  const getMemberDisplay = (m: { user?: Partial<User>; userId?: unknown }) => {
+    const userObj = m.user as Partial<User> | undefined;
+    const idFromObj = (m.userId as { id?: string } | undefined)?.id;
+    const idFromStr = typeof m.userId === 'string' ? m.userId : (typeof idFromObj === 'string' ? idFromObj : '');
+    const fallback = users.find(u => u.id === idFromStr);
+    const label = userObj ? formatUserLabel(userObj) : (fallback ? formatUserLabel(fallback) : '');
+    const email = userObj?.email || fallback?.email || '';
+    return { label, email, userIdStr: idFromStr };
+  };
+
+  const extractMemberId = (m: { id?: string; _id?: string; memberId?: unknown; userId?: unknown }) => {
+    const memberIdDirect = (m.id as string) || (m._id as string);
+    if (memberIdDirect) return memberIdDirect;
+    const memberIdField = typeof m.memberId === 'string' ? m.memberId : (m.memberId as { id?: string })?.id;
+    if (memberIdField) return memberIdField as string;
+    const userIdField = typeof m.userId === 'string' ? (m.userId as string) : (m.userId as { id?: string })?.id;
+    return userIdField || '';
+  };
+
+  const [roleEdits, setRoleEdits] = useState<Record<string, string>>({});
+
+  const handleChangeMemberRole = (memberKey: string, value: string) => {
+    setRoleEdits(prev => ({ ...prev, [memberKey]: value }));
+  };
+
+  const handleSaveMemberRole = async (member: typeof existingMembers[number]) => {
+    const memberId = extractMemberId(member);
+    if (!memberId) return alert('Member id not found');
+    const token = localStorage.getItem('accessToken');
+    try {
+      const newRole = roleEdits[memberId] || member.role || '';
+      const res = await fetch(`/api/projects/${params.id}/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed to update member');
+      // Refresh members
+      await fetchExistingMembers();
+      setRoleEdits(prev => { const { [memberId]: _, ...rest } = prev; return rest; });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to update member');
+    }
+  };
+
+  const handleDeleteMember = async (member: typeof existingMembers[number]) => {
+    if (!confirm('Remove this team member?')) return;
+    const memberId = extractMemberId(member);
+    if (!memberId) return alert('Member id not found');
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`/api/projects/${params.id}/members/${memberId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || 'Failed to remove member');
+      }
+      await fetchExistingMembers();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to remove member');
+    }
+  };
   const [teamMembers, setTeamMembers] = useState<Array<{
     userId: string;
     role: string;
@@ -81,10 +177,18 @@ export default function EditProjectPage() {
     isFeatured: false
   });
 
+  // Milestones state
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [newMilestone, setNewMilestone] = useState<{ title: string; description: string; dueDate: string; assignedTo: string }>({
+    title: '', description: '', dueDate: '', assignedTo: ''
+  });
+  const [savingMilestoneId, setSavingMilestoneId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers();
     if (params.id) {
       fetchProject();
+      fetchExistingMembers();
     }
   }, [params.id]);
 
@@ -125,6 +229,11 @@ export default function EditProjectPage() {
         const raw = (data?.data && (data.data.project || data.data)) || data.project || data.item || {};
         console.log('EditProjectPage: normalized projectData', raw);
         setProject(raw);
+        // Extract milestones if present
+        const rawMilestones = Array.isArray((raw as unknown as { milestones?: Milestone[] }).milestones)
+          ? (raw as unknown as { milestones: Milestone[] }).milestones
+          : [];
+        setMilestones(rawMilestones);
         setFormData({
           title: raw.title ?? '',
           description: raw.description ?? '',
@@ -161,6 +270,34 @@ export default function EditProjectPage() {
       router.push('/projects');
     } finally {
       setFetchLoading(false);
+    }
+  };
+
+  const fetchExistingMembers = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`/api/projects/${params.id}/members`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        // Normalize various possible shapes
+        const list = (data?.data?.members)
+          || (data?.members)
+          || (Array.isArray(data?.data) ? data.data : [])
+          || [];
+        setExistingMembers(Array.isArray(list) ? list : []);
+      } else {
+        console.warn('Failed to fetch existing members', data);
+        setExistingMembers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching existing members:', error);
+      setExistingMembers([]);
     }
   };
 
@@ -235,9 +372,26 @@ export default function EditProjectPage() {
         if (membersToAdd.length > 0) {
           // Add each new team member
           for (const member of membersToAdd) {
+            // Validate userId before sending
+            const idToUse = String(member.userId || '').trim();
+            const looksLikeObjectId = /^[a-fA-F0-9]{24}$/.test(idToUse);
+            const selectedUser = users.find(u => u.id === idToUse);
+            if (!idToUse || !looksLikeObjectId || !selectedUser) {
+              console.warn('Skipping invalid team member userId', { idToUse, looksLikeObjectId, hasSelectedUser: !!selectedUser });
+              alert('Please select a valid user for the team member.');
+              continue;
+            }
+            const computedFirst = selectedUser?.firstName || undefined;
+            const computedLast = selectedUser?.lastName || undefined;
+            const computedName = [computedFirst, computedLast].filter(Boolean).join(' ') || undefined;
             const memberData = {
-              userId: member.userId,
+              userId: idToUse,
               role: member.role,
+              // Provide name fields for backend validation
+              name: computedName,
+              userName: computedName,
+              firstName: computedFirst,
+              lastName: computedLast,
               skills: member.skills ? member.skills.split(',').map(s => s.trim()) : undefined,
               responsibilities: member.responsibilities ? member.responsibilities.split(',').map(r => r.trim()) : undefined,
               timeCommitment: member.hoursPerWeek ? {
@@ -285,7 +439,7 @@ export default function EditProjectPage() {
   const teamLeaders = users.filter(user => 
     user.role === 'team_leader' || 
     user.role === 'admin' || 
-    user.role === 'member'
+    user.role === 'team_member'
   );
 
   if (fetchLoading) {
@@ -315,9 +469,10 @@ export default function EditProjectPage() {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-md"
+            className="flex items-center p-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-md shadow-sm"
           >
             <ArrowLeftIcon className="w-5 h-5" />
+            <span className="ml-2 font-medium">Back</span>
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Edit Project</h1>
@@ -535,8 +690,8 @@ export default function EditProjectPage() {
                 >
                   <option value="">Select Team Leader</option>
                   {teamLeaders.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} ({user.email})
+                    <option key={String(user.id)} value={String(user.id)}>
+                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
                     </option>
                   ))}
                 </select>
@@ -555,12 +710,71 @@ export default function EditProjectPage() {
                 >
                   <option value="">Select Mentor (Optional)</option>
                   {mentors.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} ({user.email})
+                    <option key={String(user.id)} value={String(user.id)}>
+                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Existing Team Members */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Existing Team Members</h3>
+              <p className="text-sm text-gray-600 mt-1">These members are already part of this project.</p>
+            </div>
+            <div className="px-6 py-4">
+              {existingMembers.length === 0 ? (
+                <p className="text-sm text-gray-500">No team members found.</p>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {existingMembers.map((m, idx) => {
+                    const { label, email, userIdStr } = getMemberDisplay(m);
+                    const memberKey = extractMemberId(m) || userIdStr || String(idx);
+                    const hours = typeof m.hoursPerWeek === 'number' ? m.hoursPerWeek : (m.timeCommitment?.hoursPerWeek || undefined);
+                    return (
+                      <div key={memberKey} className="py-3 flex flex-col gap-3">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{label || email || userIdStr || 'Member'}</div>
+                            {email && <div className="text-xs text-gray-600">{email}</div>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500">Role:</span>
+                              <input
+                                type="text"
+                                value={roleEdits[memberKey] ?? (m.role || '')}
+                                onChange={(e) => handleChangeMemberRole(memberKey, e.target.value)}
+                                className="border border-gray-300 rounded px-2 py-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMemberRole(m)}
+                                className="px-2 py-1 bg-indigo-600 text-white rounded disabled:opacity-50"
+                                disabled={(roleEdits[memberKey] ?? (m.role || '')) === (m.role || '')}
+                              >
+                                Save
+                              </button>
+                            </div>
+                            {typeof hours === 'number' && <span><span className="text-gray-500">Hours/Week:</span> {hours}</span>}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMember(m)}
+                              className="px-2 py-1 bg-red-600 text-white rounded"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                        {m.contribution && <div className="text-sm text-gray-700"><span className="text-gray-500">Contribution:</span> {m.contribution}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -779,6 +993,229 @@ export default function EditProjectPage() {
                     onChange={handleInputChange}
                     className="w-full pl-10 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="https://docs.example.com"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Milestones */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Milestones</h3>
+              <p className="text-sm text-gray-600 mt-1">Add and update project milestones. These are managed via dedicated endpoints.</p>
+            </div>
+            <div className="px-6 py-4 space-y-6">
+              {/* Existing milestones list */}
+              {milestones.length === 0 ? (
+                <p className="text-sm text-gray-500">No milestones yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {milestones.map((m) => {
+                    const id = String((m as { id?: string; _id?: string }).id || (m as { _id?: string })._id || '');
+                    // Resolve assignee name for display
+                    const assignedRaw = (m as { assignedTo?: unknown }).assignedTo;
+                    const assignedObj = (typeof assignedRaw === 'object' && assignedRaw !== null ? assignedRaw : undefined) as
+                      | { id?: string; _id?: string; firstName?: string; lastName?: string; name?: string; fullName?: string; displayName?: string }
+                      | undefined;
+                    const assignedId = (
+                      typeof assignedRaw === 'string'
+                        ? assignedRaw
+                        : (assignedObj?.id || (assignedObj as { _id?: string })?._id)
+                    ) as string | undefined;
+                    const nameCandidates: string[] = [];
+                    if (assignedObj?.firstName || assignedObj?.lastName) {
+                      nameCandidates.push(`${assignedObj.firstName || ''} ${assignedObj.lastName || ''}`.trim());
+                    }
+                    if ((assignedObj as { name?: string })?.name) nameCandidates.push(String((assignedObj as { name?: string }).name));
+                    if ((assignedObj as { fullName?: string })?.fullName) nameCandidates.push(String((assignedObj as { fullName?: string }).fullName));
+                    if ((assignedObj as { displayName?: string })?.displayName) nameCandidates.push(String((assignedObj as { displayName?: string }).displayName));
+                    if (assignedId && users.length > 0) {
+                      const matchUser = users.find(u => String(u.id) === String(assignedId));
+                      if (matchUser) nameCandidates.push(`${matchUser.firstName || ''} ${matchUser.lastName || ''}`.trim());
+                    }
+                    if (assignedId && existingMembers.length > 0) {
+                      const matchMember = existingMembers.find(em => String((em.userId as string) || (em.user as { id?: string })?.id) === String(assignedId));
+                      const label = matchMember ? `${(matchMember.user?.firstName || '')} ${(matchMember.user?.lastName || '')}`.trim() : '';
+                      if (label) nameCandidates.push(label);
+                    }
+                    const assigneeName = (nameCandidates.find(n => n && n.trim().length > 0) || '').trim();
+                    return (
+                      <div key={id || m.title} className="p-4 border border-gray-200 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <input
+                              type="text"
+                              value={m.title}
+                              onChange={(e) => setMilestones(prev => prev.map(x => (x === m ? { ...x, title: e.target.value } : x)))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                            <input
+                              type="date"
+                              value={m.dueDate ? String(m.dueDate).split('T')[0] : ''}
+                              onChange={(e) => setMilestones(prev => prev.map(x => (x === m ? { ...x, dueDate: e.target.value } : x)))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select
+                              value={m.status || 'pending'}
+                              onChange={(e) => setMilestones(prev => prev.map(x => (x === m ? { ...x, status: e.target.value as Milestone['status'] } : x)))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                              <option value="overdue">Overdue</option>
+                            </select>
+                          </div>
+                          <div className="text-sm text-gray-600 md:pl-2">
+                            <div className="mb-1 font-medium">Assignee</div>
+                            <div>{assigneeName || 'Unassigned'}</div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={!id || savingMilestoneId === id}
+                              onClick={async () => {
+                                if (!id) return;
+                                setSavingMilestoneId(id);
+                                try {
+                                  const token = localStorage.getItem('accessToken');
+                                  const payload: Partial<Milestone> = {
+                                    title: m.title,
+                                    description: m.description,
+                                    dueDate: m.dueDate,
+                                    status: m.status,
+                                    completedAt: m.completedAt
+                                  };
+                                  const res = await fetch(`/api/projects/${params.id}/milestones/${id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                  });
+                                  const data = await res.json();
+                                  if (!res.ok) throw new Error(data?.message || 'Failed to update milestone');
+                                  const updated = (data?.data?.milestones) || (data?.milestones) || [];
+                                  if (Array.isArray(updated)) setMilestones(updated);
+                                } catch (e) {
+                                  alert(e instanceof Error ? e.message : 'Failed to update milestone');
+                                } finally {
+                                  setSavingMilestoneId(null);
+                                }
+                              }}
+                              className="px-3 py-2 bg-indigo-600 text-white rounded-md disabled:opacity-50"
+                            >
+                              {savingMilestoneId === id ? 'Saving…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                        {m.description !== undefined && (
+                          <div className="mt-3">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <textarea
+                              value={m.description || ''}
+                              onChange={(e) => setMilestones(prev => prev.map(x => (x === m ? { ...x, description: e.target.value } : x)))}
+                              rows={2}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder="Optional short description"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add new milestone */}
+              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Add Milestone</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      value={newMilestone.title}
+                      onChange={(e) => setNewMilestone(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g., Prototype v1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
+                    <input
+                      type="date"
+                      value={newMilestone.dueDate}
+                      onChange={(e) => setNewMilestone(prev => ({ ...prev, dueDate: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+                    <select
+                      value={newMilestone.assignedTo}
+                      onChange={(e) => setNewMilestone(prev => ({ ...prev, assignedTo: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Unassigned</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{formatUserLabel(u)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!newMilestone.title || !newMilestone.dueDate) {
+                          alert('Title and Due Date are required');
+                          return;
+                        }
+                        setSavingMilestoneId('new');
+                        try {
+                          const token = localStorage.getItem('accessToken');
+                          const payload = {
+                            title: newMilestone.title,
+                            description: newMilestone.description || undefined,
+                            dueDate: newMilestone.dueDate,
+                            assignedTo: newMilestone.assignedTo || undefined
+                          };
+                          const res = await fetch(`/api/projects/${params.id}/milestones`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data?.message || 'Failed to add milestone');
+                          const updated = (data?.data?.milestones) || (data?.milestones) || [];
+                          if (Array.isArray(updated)) setMilestones(updated);
+                          setNewMilestone({ title: '', description: '', dueDate: '', assignedTo: '' });
+                        } catch (e) {
+                          alert(e instanceof Error ? e.message : 'Failed to add milestone');
+                        } finally {
+                          setSavingMilestoneId(null);
+                        }
+                      }}
+                      className="px-3 py-2 bg-indigo-600 text-white rounded-md"
+                    >
+                      {savingMilestoneId === 'new' ? 'Adding…' : 'Add Milestone'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={newMilestone.description}
+                    onChange={(e) => setNewMilestone(prev => ({ ...prev, description: e.target.value }))}
+                    rows={2}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Optional short description"
                   />
                 </div>
               </div>

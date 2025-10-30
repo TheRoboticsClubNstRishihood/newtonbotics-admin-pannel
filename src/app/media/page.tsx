@@ -15,6 +15,7 @@ import {
   DocumentTextIcon,
   MusicalNoteIcon
 } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 
 type FileType = 'image' | 'video' | 'document' | 'audio';
 
@@ -101,6 +102,7 @@ export default function MediaPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [users, setUsers] = useState<SimpleUser[]>([]);
+  const [projectNames, setProjectNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -145,6 +147,9 @@ export default function MediaPage() {
     parentCategoryId: ''
   });
 
+  // UI helper: show an explicit suggestion dropdown for project names
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+
   const [editForm, setEditForm] = useState<{ _id: string; title: string; description: string; fileType: FileType | ''; categoryId: string; thumbnailUrl: string; tags: string; isFeatured: boolean; fileUrl?: string } | null>(null);
 
   useEffect(() => {
@@ -158,7 +163,7 @@ export default function MediaPage() {
         window.location.href = '/';
         return;
       }
-      await Promise.all([fetchMedia(), fetchCategoriesOnce(), fetchUsersOnce()]);
+      await Promise.all([fetchMedia(), fetchCategoriesOnce(), fetchUsersOnce(), fetchProjectsOnce()]);
     } catch (e) {
       console.error(e);
       setError('Failed to load media');
@@ -267,6 +272,52 @@ export default function MediaPage() {
       console.error('Failed to fetch users', e);
     }
   };
+
+  const fetchProjectsOnce = async (force = false) => {
+    if (projectNames.length > 0 && !force) return;
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+      const limitPerPage = 20; // match Projects page
+      let skip = 0;
+      const collected: string[] = [];
+      for (let i = 0; i < 30; i++) { // cap to ~600 items max
+        const params = new URLSearchParams({ 
+          limit: String(limitPerPage), 
+          skip: String(skip), 
+          sort: 'createdAt', 
+          order: 'desc' 
+        });
+        const res = await fetch(`/api/projects?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) {
+          console.warn('Projects fetch failed with status', res.status);
+          break;
+        }
+        const data = await res.json();
+        const raw = data?.data?.projects || data?.data?.items || data?.projects || [];
+        const names = Array.isArray(raw)
+          ? raw.map((p: { title?: string; name?: string }) => String(p?.title || p?.name || '').trim()).filter((n: string) => n.length > 0)
+          : [];
+        for (const n of names) {
+          if (n && !collected.includes(n)) collected.push(n);
+        }
+        if (names.length < limitPerPage || collected.length >= 500) break;
+        skip += limitPerPage;
+      }
+      setProjectNames(collected.slice(0, 500));
+    } catch (e) {
+      console.warn('Failed to fetch project names for category suggestions', e);
+    }
+  };
+
+  // When the create-category modal opens, force-load project names
+  useEffect(() => {
+    if (showCreateCategory) {
+      fetchProjectsOnce(true);
+    }
+  }, [showCreateCategory]);
 
   const fetchMedia = async () => {
     try {
@@ -805,25 +856,14 @@ export default function MediaPage() {
                           ) : (
                             (item.thumbnailUrl || item.fileUrl) ? (
                               <>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
+                                <Image
                                   src={(item.thumbnailUrl || item.fileUrl).includes('cloudinary.com')
                                     ? (item.thumbnailUrl || item.fileUrl).replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
                                     : (item.thumbnailUrl || item.fileUrl)}
                                   alt={item.title}
+                                  width={64}
+                                  height={40}
                                   className="h-10 w-16 object-cover"
-                                  onError={(e) => {
-                                    // Try the original URL once if we attempted a transformed one
-                                    if ((item.thumbnailUrl || item.fileUrl) && e.currentTarget.src !== (item.thumbnailUrl || item.fileUrl)) {
-                                      e.currentTarget.src = (item.thumbnailUrl || item.fileUrl) as string;
-                                      return;
-                                    }
-                                    e.currentTarget.style.display = 'none';
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.style.display = 'flex';
-                                    }
-                                  }}
                                 />
                                 <div className="h-10 w-16 items-center justify-center hidden" style={{ display: 'none' }}>
                                   {iconForType('image')}
@@ -1195,14 +1235,62 @@ export default function MediaPage() {
                     setCreateCategoryLoading(false);
                   }
                 }} className="p-6 space-y-4">
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
                       value={categoryForm.name}
                       onChange={e => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                      onFocus={async () => {
+                        if (projectNames.length === 0) {
+                          try { await fetchProjectsOnce(); } catch {}
+                        }
+                        if (projectNames.length > 0) setShowNameSuggestions(true);
+                      }}
+                      onBlur={() => setTimeout(() => setShowNameSuggestions(false), 150)}
+                      list="projectNameOptions"
                       required minLength={2} maxLength={100}
+                      placeholder={projectNames.length === 0 ? 'Enter category name' : 'Type to search project names...'}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 placeholder-gray-500"
                     />
+                    {/* Browser-native datalist (works after typing) */}
+                    {projectNames.length > 0 && (
+                      <datalist id="projectNameOptions">
+                        {projectNames.map((n) => (
+                          <option key={n} value={n} />
+                        ))}
+                      </datalist>
+                    )}
+                    {/* Explicit suggestion dropdown (visible immediately on focus) */}
+                    {showNameSuggestions && projectNames.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-md border border-gray-200 bg-white shadow">
+                        {projectNames
+                          .filter(n => {
+                            const q = categoryForm.name.trim().toLowerCase();
+                            if (!q) return true;
+                            return n.toLowerCase().includes(q);
+                          })
+                          .slice(0, 200)
+                          .map((n) => (
+                            <button
+                              type="button"
+                              key={n}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setCategoryForm({ ...categoryForm, name: n });
+                                setShowNameSuggestions(false);
+                              }}
+                              className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-900"
+                            >
+                              {n}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      {projectNames.length > 0
+                        ? `Loaded ${projectNames.length} project name${projectNames.length === 1 ? '' : 's'}.`
+                        : 'No project names loaded yet. Click the field to load suggestions.'}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
