@@ -30,6 +30,26 @@ export async function GET(
     });
 
     const data = await response.json();
+    
+    console.log('=== GET EVENT RESPONSE DEBUG ===');
+    console.log('Backend response status:', response.status);
+    console.log('Full backend response data:', JSON.stringify(data, null, 2));
+    if (data.data && data.data.item) {
+      console.log('Event from backend (GET):', {
+        _id: data.data.item._id,
+        title: data.data.item.title,
+        startDate: data.data.item.startDate,
+        endDate: data.data.item.endDate,
+        startTime: data.data.item.startTime,
+        endTime: data.data.item.endTime,
+        hasStartTime: !!data.data.item.startTime,
+        hasEndTime: !!data.data.item.endTime,
+        allKeys: Object.keys(data.data.item)
+      });
+    } else {
+      console.warn('Unexpected response structure:', data);
+    }
+    console.log('=== END GET EVENT RESPONSE DEBUG ===');
 
     if (response.ok) {
       return NextResponse.json(data);
@@ -67,6 +87,13 @@ export async function PUT(
     const body = await request.json();
     console.log('Backend URL:', `${backendUrl}/api/events/${id}`);
     console.log('Event ID:', id);
+    console.log('Request body being sent to backend:', JSON.stringify(body, null, 2));
+    console.log('Time fields in request:', {
+      startTime: body.startTime,
+      endTime: body.endTime,
+      hasStartTime: !!body.startTime,
+      hasEndTime: !!body.endTime
+    });
 
     const response = await fetch(`${backendUrl}/api/events/${id}`, {
       method: 'PUT',
@@ -78,6 +105,17 @@ export async function PUT(
     });
 
     const data = await response.json();
+    
+    console.log('Backend response status:', response.status);
+    console.log('Backend response data:', JSON.stringify(data, null, 2));
+    if (data.data && data.data.item) {
+      console.log('Updated event from backend:', {
+        startTime: data.data.item.startTime,
+        endTime: data.data.item.endTime,
+        startDate: data.data.item.startDate,
+        endDate: data.data.item.endDate
+      });
+    }
 
     if (response.ok) {
       return NextResponse.json(data);

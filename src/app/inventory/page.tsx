@@ -11,10 +11,14 @@ import {
   CubeIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon
+  ClockIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 import AdminLayout from '../../components/AdminLayout';
 import { useToast } from '../../components/ToastContext';
+import CheckoutModal from '../../components/inventory/CheckoutModal';
+import ReturnModal from '../../components/inventory/ReturnModal';
 
 interface EquipmentCategory {
   id: string;
@@ -86,6 +90,8 @@ export default function InventoryPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function to get equipment ID (handles both id and _id)
@@ -307,6 +313,13 @@ export default function InventoryPage() {
           </div>
           <div className="flex space-x-3">
             <button
+              onClick={() => router.push('/inventory/checkouts')}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <ArrowDownTrayIcon className="w-5 h-5 mr-2" />
+              Checkouts
+            </button>
+            <button
               onClick={() => router.push('/inventory/categories')}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
@@ -431,6 +444,7 @@ export default function InventoryPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {equipment.map((item) => {
                     const stockPercentage = getStockPercentage(item.currentQuantity, item.maxQuantity);
+                    const equipmentId = getEquipmentId(item);
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -481,12 +495,36 @@ export default function InventoryPage() {
                                 setShowDetailModal(true);
                               }}
                               className="text-indigo-600 hover:text-indigo-900"
+                              title="View Details"
                             >
                               <EyeIcon className="w-4 h-4" />
                             </button>
+                            {item.currentQuantity > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedEquipment({ ...item, id: equipmentId });
+                                  setShowCheckoutModal(true);
+                                }}
+                                className="text-green-600 hover:text-green-900"
+                                title="Checkout"
+                              >
+                                <ArrowDownTrayIcon className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => router.push(`/inventory/edit/${getEquipmentId(item)}`)}
+                              onClick={() => {
+                                setSelectedEquipment({ ...item, id: equipmentId });
+                                setShowReturnModal(true);
+                              }}
                               className="text-blue-600 hover:text-blue-900"
+                              title="Return"
+                            >
+                              <ArrowUpTrayIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => router.push(`/inventory/edit/${equipmentId}`)}
+                              className="text-yellow-600 hover:text-yellow-900"
+                              title="Edit"
                             >
                               <PencilIcon className="w-4 h-4" />
                             </button>
@@ -501,6 +539,7 @@ export default function InventoryPage() {
                                 setShowDeleteModal(true);
                               }}
                               className="text-red-600 hover:text-red-900"
+                              title="Delete"
                             >
                               <TrashIcon className="w-4 h-4" />
                             </button>
@@ -698,6 +737,36 @@ export default function InventoryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Checkout Modal */}
+      {selectedEquipment && (
+        <CheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={() => {
+            setShowCheckoutModal(false);
+            setSelectedEquipment(null);
+          }}
+          equipment={selectedEquipment}
+          onCheckoutSuccess={() => {
+            fetchEquipment();
+          }}
+        />
+      )}
+
+      {/* Return Modal */}
+      {selectedEquipment && (
+        <ReturnModal
+          isOpen={showReturnModal}
+          onClose={() => {
+            setShowReturnModal(false);
+            setSelectedEquipment(null);
+          }}
+          equipment={selectedEquipment}
+          onReturnSuccess={() => {
+            fetchEquipment();
+          }}
+        />
       )}
     </AdminLayout>
   );
