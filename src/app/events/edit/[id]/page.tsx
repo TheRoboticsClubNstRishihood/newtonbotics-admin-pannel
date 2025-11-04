@@ -29,6 +29,8 @@ interface Event {
   requiresRegistration: boolean;
   registrationDeadline?: string;
   registrationFormLink?: string;
+  links?: Array<{ label: string; url: string }>;
+  sampleLinks?: Array<{ label: string; url: string }>;
   featureOptions?: {
     showInNav: boolean;
     navLabel?: string;
@@ -63,6 +65,7 @@ interface EventFormData {
   requiresRegistration: boolean;
   registrationDeadline?: string;
   registrationFormLink?: string;
+  links?: Array<{ label: string; url: string }>;
   featureOptions?: {
     showInNav?: boolean;
     navLabel?: string;
@@ -94,6 +97,7 @@ export default function EditEventPage() {
     requiresRegistration: false,
     registrationDeadline: '',
     registrationFormLink: '',
+    links: [],
     featureOptions: {
       showInNav: false,
       navLabel: '',
@@ -223,6 +227,9 @@ export default function EditEventPage() {
           requiresRegistration: eventData.requiresRegistration || false,
           registrationDeadline: eventData.registrationDeadline ? extractDate(eventData.registrationDeadline) : '',
           registrationFormLink: eventData.registrationFormLink || '',
+          links: Array.isArray(eventData.links)
+            ? eventData.links
+            : (Array.isArray((eventData as any).sampleLinks) ? (eventData as any).sampleLinks : []),
           featureOptions: eventData.featureOptions || {
             showInNav: false,
             navLabel: '',
@@ -408,6 +415,22 @@ export default function EditEventPage() {
       }
     }
 
+    // Validate links array if present
+    if (formData.links && formData.links.length > 0) {
+      for (const [index, link] of formData.links.entries()) {
+        if (!link.label || link.label.trim().length < 2) {
+          showError(`Link #${index + 1} label must be at least 2 characters`);
+          return;
+        }
+        try {
+          new URL(link.url);
+        } catch {
+          showError(`Link #${index + 1} URL must be valid`);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('accessToken');
@@ -423,7 +446,7 @@ export default function EditEventPage() {
       // Prepare the request data with organizerId and proper date/time formatting
       interface FeatureOptions { showInNav?: boolean; navLabel?: string; navOrder?: number }
       interface UpdatePayload {
-        title?: string; description?: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string; location?: string; maxCapacity?: number; organizerId?: string; category?: string; type?: string; isFeatured?: boolean; imageUrl?: string; requiresRegistration?: boolean; registrationDeadline?: string; registrationFormLink?: string; featureOptions?: FeatureOptions; [key: string]: unknown;
+        title?: string; description?: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string; location?: string; maxCapacity?: number; organizerId?: string; category?: string; type?: string; isFeatured?: boolean; imageUrl?: string; requiresRegistration?: boolean; registrationDeadline?: string; registrationFormLink?: string; sampleLinks?: Array<{ label: string; url: string }>; featureOptions?: FeatureOptions; [key: string]: unknown;
       }
       
       // Handle time fields: always include them in the update request
@@ -475,6 +498,7 @@ export default function EditEventPage() {
         requiresRegistration: formData.requiresRegistration,
         registrationDeadline: formData.registrationDeadline,
         registrationFormLink: formData.registrationFormLink,
+        sampleLinks: formData.links && formData.links.length ? formData.links : undefined,
         featureOptions: formData.featureOptions
       };
       
@@ -1023,6 +1047,78 @@ export default function EditEventPage() {
                         Order in navigation menu (lower numbers appear first)
                       </p>
                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Helpful Links */}
+            <div>
+              <h3 className="text-lg font-medium text-black mb-4">Helpful Links</h3>
+              <div className="space-y-4">
+                {(formData.links && formData.links.length > 0 ? formData.links : []).map((link, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">Label</label>
+                      <input
+                        type="text"
+                        value={link.label}
+                        onChange={(e) => setFormData(prev => {
+                          const links = [...(prev.links || [])];
+                          links[idx] = { ...links[idx], label: e.target.value } as { label: string; url: string };
+                          return { ...prev, links };
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                        placeholder="e.g., Practice Questions"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">URL</label>
+                      <input
+                        type="url"
+                        value={link.url}
+                        onChange={(e) => setFormData(prev => {
+                          const links = [...(prev.links || [])];
+                          links[idx] = { ...links[idx], url: e.target.value } as { label: string; url: string };
+                          return { ...prev, links };
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                        placeholder="https://example.com/..."
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex justify-between">
+                      <button
+                        type="button"
+                        className="text-sm text-red-600 hover:text-red-800"
+                        onClick={() => setFormData(prev => {
+                          const links = [...(prev.links || [])];
+                          links.splice(idx, 1);
+                          return { ...prev, links };
+                        })}
+                      >
+                        Remove
+                      </button>
+                      {idx === (formData.links?.length || 0) - 1 && (
+                        <button
+                          type="button"
+                          className="text-sm text-indigo-600 hover:text-indigo-800"
+                          onClick={() => setFormData(prev => ({ ...prev, links: [...(prev.links || []), { label: '', url: '' }] }))}
+                        >
+                          Add another link
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {(!formData.links || formData.links.length === 0) && (
+                  <div>
+                    <button
+                      type="button"
+                      className="text-sm text-indigo-600 hover:text-indigo-800"
+                      onClick={() => setFormData(prev => ({ ...prev, links: [{ label: '', url: '' }] }))}
+                    >
+                      Add a link
+                    </button>
                   </div>
                 )}
               </div>
