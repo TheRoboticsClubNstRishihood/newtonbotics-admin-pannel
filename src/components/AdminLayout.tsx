@@ -21,7 +21,8 @@ import {
   FolderIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
-  HomeIcon
+  HomeIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import { NotificationDropdown } from './notifications/NotificationDropdown';
 import DeveloperCredit from './DeveloperCredit';
@@ -96,6 +97,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     { name: 'Newsletter', icon: EnvelopeIcon, href: '/newsletter' },
     { name: 'Projects', icon: FolderIcon, href: '/projects' },
     { name: 'Project Requests', icon: ClipboardDocumentListIcon, href: '/project-requests' },
+    { name: 'Research Areas', icon: AcademicCapIcon, href: '/research-areas' },
     { name: 'Audit Trail', icon: ClockIcon, href: '/audit-trail' },
     { name: 'Team', icon: UserGroupIcon, href: '/team' },
     { name: 'Media', icon: PhotoIcon, href: '/media' },

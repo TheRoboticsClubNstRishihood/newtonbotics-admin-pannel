@@ -23,6 +23,8 @@ interface Event {
   description: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   location: string;
   maxCapacity: number;
   currentRegistrations: number;
@@ -404,10 +406,55 @@ export default function EventsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-black">
-                          <div>{new Date(event.startDate).toLocaleDateString()}</div>
-                          <div className="text-gray-500">
-                            {new Date(event.startDate).toLocaleTimeString()} - {new Date(event.endDate).toLocaleTimeString()}
-                          </div>
+                          {/* Format dates */}
+                          {(() => {
+                            const startDate = new Date(event.startDate);
+                            const endDate = new Date(event.endDate);
+                            const startDateStr = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            const endDateStr = endDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            
+                            // Format times if available (HH:MM or HH:MM:SS format)
+                            const formatTime = (time: string | undefined): string => {
+                              if (!time || time.trim() === '') return '';
+                              // Handle HH:MM or HH:MM:SS format (e.g., "05:30" or "05:30:00")
+                              const parts = time.split(':');
+                              if (parts.length >= 2) {
+                                const hours = parseInt(parts[0], 10);
+                                const minutes = parts[1];
+                                if (isNaN(hours)) return time;
+                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                                return `${displayHours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+                              }
+                              return time;
+                            };
+                            
+                            const startTimeStr = formatTime(event.startTime);
+                            const endTimeStr = formatTime(event.endTime);
+                            
+                            return (
+                              <>
+                                <div className="font-medium">
+                                  {startDateStr === endDateStr ? (
+                                    startDateStr
+                                  ) : (
+                                    <>
+                                      {startDateStr} - {endDateStr}
+                                    </>
+                                  )}
+                                </div>
+                                {(startTimeStr || endTimeStr) ? (
+                                  <div className="text-gray-500 text-xs mt-1">
+                                    {startTimeStr} - {endTimeStr}
+                                  </div>
+                                ) : (
+                                  <div className="text-gray-500 text-xs mt-1">
+                                    All Day
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

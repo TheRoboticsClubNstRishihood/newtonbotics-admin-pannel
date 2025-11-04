@@ -15,6 +15,8 @@ interface Event {
   description: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   location: string;
   maxCapacity: number;
   currentRegistrations: number;
@@ -49,6 +51,8 @@ interface EventFormData {
   description: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   location: string;
   maxCapacity: number;
   organizerId: string;
@@ -78,6 +82,8 @@ export default function EditEventPage() {
     description: '',
     startDate: '',
     endDate: '',
+    startTime: '',
+    endTime: '',
     location: '',
     maxCapacity: 0,
     organizerId: '',
@@ -142,11 +148,71 @@ export default function EditEventPage() {
         const data = await response.json();
         const eventData = data.data.item;
         setEvent(eventData);
+        
+        // Debug logging for time fields from backend
+        console.log('Event data received from backend:', {
+          startDate: eventData.startDate,
+          endDate: eventData.endDate,
+          startTime: eventData.startTime,
+          endTime: eventData.endTime,
+          fullEventData: eventData
+        });
+        
+        // Extract date from ISO8601 string (YYYY-MM-DD)
+        const extractDate = (isoString: string): string => {
+          if (!isoString) return '';
+          // Handle both date-only and datetime formats
+          return isoString.split('T')[0];
+        };
+        
+        // Extract time from separate time field or from datetime string (HH:MM or HH:MM:SS)
+        // Normalize to HH:MM:SS format for HTML time input compatibility
+        const extractTime = (timeString: string | undefined, isoString?: string): string => {
+          if (timeString) {
+            // If separate time field exists, use it (format: HH:MM or HH:MM:SS)
+            // Normalize to HH:MM:SS for HTML time input with step="1"
+            let extracted = timeString.length <= 8 ? timeString : timeString.substring(0, 8);
+            // If format is HH:MM (5 chars), convert to HH:MM:SS for HTML time input
+            if (extracted.length === 5) {
+              extracted = extracted + ':00';
+            }
+            console.log('Extracted time from separate field:', { timeString, extracted });
+            return extracted;
+          }
+          // Fallback: try to extract from datetime string (for backward compatibility)
+          if (isoString && isoString.includes('T')) {
+            const timePart = isoString.split('T')[1];
+            if (timePart) {
+              // Remove timezone and milliseconds, keep HH:MM or HH:MM:SS
+              let extracted = timePart.split(/[\.\+\-Z]/)[0];
+              extracted = extracted.length <= 8 ? extracted : extracted.substring(0, 8);
+              // Normalize to HH:MM:SS if needed
+              if (extracted.length === 5) {
+                extracted = extracted + ':00';
+              }
+              console.log('Extracted time from datetime string:', { isoString, timePart, extracted });
+              return extracted;
+            }
+          }
+          console.log('No time found:', { timeString, isoString });
+          return '';
+        };
+        
+        const extractedStartTime = extractTime(eventData.startTime, eventData.startDate);
+        const extractedEndTime = extractTime(eventData.endTime, eventData.endDate);
+        
+        console.log('Extracted times for form:', {
+          startTime: extractedStartTime,
+          endTime: extractedEndTime
+        });
+        
         setFormData({
           title: eventData.title,
           description: eventData.description,
-          startDate: eventData.startDate.split('T')[0],
-          endDate: eventData.endDate.split('T')[0],
+          startDate: extractDate(eventData.startDate),
+          endDate: extractDate(eventData.endDate),
+          startTime: extractedStartTime,
+          endTime: extractedEndTime,
           location: eventData.location,
           maxCapacity: eventData.maxCapacity,
           organizerId: eventData.organizerId,
@@ -155,7 +221,7 @@ export default function EditEventPage() {
           isFeatured: eventData.isFeatured,
           imageUrl: eventData.imageUrl || '',
           requiresRegistration: eventData.requiresRegistration || false,
-          registrationDeadline: eventData.registrationDeadline ? eventData.registrationDeadline.split('T')[0] + 'T' + eventData.registrationDeadline.split('T')[1].substring(0, 5) : '',
+          registrationDeadline: eventData.registrationDeadline ? extractDate(eventData.registrationDeadline) : '',
           registrationFormLink: eventData.registrationFormLink || '',
           featureOptions: eventData.featureOptions || {
             showInNav: false,
@@ -231,13 +297,72 @@ export default function EditEventPage() {
       return;
     }
     
-    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+    // Validate that both times are provided together, or neither
+    const hasStartTime = formData.startTime && formData.startTime.trim() !== '';
+    const hasEndTime = formData.endTime && formData.endTime.trim() !== '';
+    
+    if (hasStartTime && !hasEndTime) {
+      showError('Both start time and end time must be provided together');
+      return;
+    }
+    
+    if (!hasStartTime && hasEndTime) {
+      showError('Both start time and end time must be provided together');
+      return;
+    }
+    
+    // Validate time format if provided (HH:MM or HH:MM:SS)
+    if (hasStartTime) {
+      const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+      if (!timePattern.test(formData.startTime!)) {
+        showError('Start time must be in HH:MM or HH:MM:SS format (24-hour, e.g., 14:00 or 14:00:00)');
+        return;
+      }
+    }
+    
+    if (hasEndTime) {
+      const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+      if (!timePattern.test(formData.endTime!)) {
+        showError('End time must be in HH:MM or HH:MM:SS format (24-hour, e.g., 16:00 or 16:00:00)');
+        return;
+      }
+    }
+    
+    // Validate that end date is after start date
+    const startDateObj = new Date(formData.startDate);
+    const endDateObj = new Date(formData.endDate);
+    
+    if (endDateObj < startDateObj) {
       console.warn('Edit Event validation failed: end date is before start date', {
         startDate: formData.startDate,
         endDate: formData.endDate
       });
-      showError('End date cannot be before start date');
+      showError('End date must be after start date');
       return;
+    }
+    
+    // Validate full datetime: end datetime must be after start datetime
+    if (hasStartTime && hasEndTime) {
+      // Both times provided - check full datetime
+      if (formData.startDate === formData.endDate) {
+        // Same date - end time must be after start time
+        const startTimeValue = formData.startTime!.replace(/:/g, '');
+        const endTimeValue = formData.endTime!.replace(/:/g, '');
+        // Pad to 6 digits if needed (HHMM -> HHMM00)
+        const startPadded = startTimeValue.length === 4 ? startTimeValue + '00' : startTimeValue;
+        const endPadded = endTimeValue.length === 4 ? endTimeValue + '00' : endTimeValue;
+        if (endPadded <= startPadded) {
+          showError('End time must be after start time when dates are the same');
+          return;
+        }
+      } else {
+        // Different dates - if end date equals start date (shouldn't happen after first check), still validate
+        // But if end date is after start date, any times are valid
+        // This case is already handled by the date check above
+      }
+    } else if (!hasStartTime && !hasEndTime) {
+      // No times provided - only date validation needed (already done above)
+      // If dates are same and no times, that's valid (all-day same-day event)
     }
     
     if (!formData.location.trim()) {
@@ -295,24 +420,82 @@ export default function EditEventPage() {
       const userData = localStorage.getItem('user');
       const user = userData ? JSON.parse(userData) : null;
       
-      // Prepare the request data with organizerId and proper date formatting
-      const start = new Date(formData.startDate);
-      const end = new Date(formData.endDate);
-      const isSameDay = start.toDateString() === end.toDateString();
-      if (isSameDay) {
-        console.info('Edit Event: same-day detected, normalizing end time to end-of-day');
-        end.setHours(23, 59, 59, 999);
-      }
+      // Prepare the request data with organizerId and proper date/time formatting
       interface FeatureOptions { showInNav?: boolean; navLabel?: string; navOrder?: number }
       interface UpdatePayload {
-        title?: string; description?: string; startDate?: string; endDate?: string; location?: string; maxCapacity?: number; organizerId?: string; category?: string; type?: string; isFeatured?: boolean; imageUrl?: string; requiresRegistration?: boolean; registrationDeadline?: string; registrationFormLink?: string; featureOptions?: FeatureOptions; [key: string]: unknown;
+        title?: string; description?: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string; location?: string; maxCapacity?: number; organizerId?: string; category?: string; type?: string; isFeatured?: boolean; imageUrl?: string; requiresRegistration?: boolean; registrationDeadline?: string; registrationFormLink?: string; featureOptions?: FeatureOptions; [key: string]: unknown;
       }
-      const requestData: UpdatePayload = {
-        ...formData,
-        organizerId: user?.id || '68a30681af3f3b7d9e2653a3', // Use user ID or fallback
-        startDate: start.toISOString(),
-        endDate: end.toISOString()
+      
+      // Handle time fields: always include them in the update request
+      // Backend requires both times together, or empty strings to clear them
+      const hasStartTime = formData.startTime && formData.startTime.trim() !== '';
+      const hasEndTime = formData.endTime && formData.endTime.trim() !== '';
+      
+      // Normalize time format to HH:MM (remove seconds if present) to match backend preference
+      const normalizeTime = (time: string): string => {
+        if (!time || time.trim() === '') return '';
+        const trimmed = time.trim();
+        // If format is HH:MM:SS, convert to HH:MM
+        if (trimmed.length === 8 && trimmed.includes(':')) {
+          return trimmed.substring(0, 5); // Extract HH:MM from HH:MM:SS
+        }
+        // If already HH:MM, return as-is
+        return trimmed;
       };
+      
+      // Determine what to send for time fields
+      let startTimeValue = '';
+      let endTimeValue = '';
+      
+      if (hasStartTime && hasEndTime) {
+        // Both times provided - normalize and send them
+        startTimeValue = normalizeTime(formData.startTime!);
+        endTimeValue = normalizeTime(formData.endTime!);
+      } else {
+        // At least one time is missing - send empty strings to clear existing times
+        startTimeValue = '';
+        endTimeValue = '';
+      }
+      
+      // Build request data, explicitly handling time fields
+      const requestData: UpdatePayload = {
+        title: formData.title,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        startTime: startTimeValue, // Always include, even if empty string
+        endTime: endTimeValue, // Always include, even if empty string
+        location: formData.location,
+        maxCapacity: formData.maxCapacity,
+        organizerId: user?.id || '68a30681af3f3b7d9e2653a3',
+        category: formData.category,
+        type: formData.type,
+        isFeatured: formData.isFeatured,
+        imageUrl: formData.imageUrl,
+        requiresRegistration: formData.requiresRegistration,
+        registrationDeadline: formData.registrationDeadline,
+        registrationFormLink: formData.registrationFormLink,
+        featureOptions: formData.featureOptions
+      };
+      
+      // Ensure time fields are explicitly included in the payload
+      console.log('=== TIME FIELDS DEBUG ===');
+      console.log('Form data times:', {
+        rawStartTime: formData.startTime,
+        rawEndTime: formData.endTime,
+        hasStartTime,
+        hasEndTime
+      });
+      console.log('Normalized times being sent:', {
+        startTime: requestData.startTime,
+        endTime: requestData.endTime,
+        startTimeType: typeof requestData.startTime,
+        endTimeType: typeof requestData.endTime,
+        startTimeLength: requestData.startTime?.length,
+        endTimeLength: requestData.endTime?.length
+      });
+      console.log('Full request payload:', JSON.stringify(requestData, null, 2));
+      console.log('=== END TIME FIELDS DEBUG ===');
 
       // Normalize registrationDeadline to ISO8601 only if provided and registration is required
       if (formData.requiresRegistration) {
@@ -348,7 +531,22 @@ export default function EditEventPage() {
         body: JSON.stringify(requestData)
       });
 
+      const responseData = await response.json().catch(() => ({}));
+      
       if (response.ok) {
+        console.log('=== UPDATE RESPONSE DEBUG ===');
+        console.log('Update response received:', responseData);
+        if (responseData.data && responseData.data.item) {
+          console.log('Updated event times in response:', {
+            startTime: responseData.data.item.startTime,
+            endTime: responseData.data.item.endTime,
+            startDate: responseData.data.item.startDate,
+            endDate: responseData.data.item.endDate
+          });
+        } else {
+          console.warn('Response data structure:', responseData);
+        }
+        console.log('=== END UPDATE RESPONSE DEBUG ===');
         showSuccess('Event updated successfully!');
         router.push('/events');
       } else {
@@ -552,6 +750,36 @@ export default function EditEventPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
                     required
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Start Time (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.startTime || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                    step="1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Format: HH:MM or HH:MM:SS (24-hour, e.g., 14:00 or 14:00:00)</p>
+                  <p className="text-xs text-gray-500 mt-1">Both start and end times must be provided together, or leave both empty to clear</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    End Time (Optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.endTime || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                    step="1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Format: HH:MM or HH:MM:SS (24-hour, e.g., 16:00 or 16:00:00)</p>
+                  <p className="text-xs text-gray-500 mt-1">Both start and end times must be provided together, or leave both empty to clear</p>
                 </div>
               </div>
             </div>
