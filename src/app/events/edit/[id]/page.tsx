@@ -227,9 +227,9 @@ export default function EditEventPage() {
           requiresRegistration: eventData.requiresRegistration || false,
           registrationDeadline: eventData.registrationDeadline ? extractDate(eventData.registrationDeadline) : '',
           registrationFormLink: eventData.registrationFormLink || '',
-          links: Array.isArray(eventData.links)
-            ? eventData.links
-            : (Array.isArray((eventData as any).sampleLinks) ? (eventData as any).sampleLinks : []),
+          links: Array.isArray((eventData as Event).links)
+            ? (eventData as Event).links
+            : (Array.isArray((eventData as Event).sampleLinks) ? (eventData as Event).sampleLinks : []),
           featureOptions: eventData.featureOptions || {
             showInNav: false,
             navLabel: '',
