@@ -44,6 +44,16 @@ export default function Home() {
     if (userData) {
       try {
         const user = JSON.parse(userData);
+        // Allow admin or team_member (project leaders are allowed via login check)
+        if (user.role !== 'admin' && user.role !== 'team_member') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          setError("You don't have permission to visit admin");
+          return;
+        }
         setUser(user);
         setIsAuthenticated(true);
         setIsLoading(false);
@@ -66,7 +76,17 @@ export default function Home() {
       const data = await response.json();
 
       if (data.success) {
-        setUser(data.data.user);
+        const user = data.data.user;
+        // Allow admin or team_member (project leaders are allowed via login check)
+        if (user.role !== 'admin' && user.role !== 'team_member') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+          setError("You don't have permission to visit admin");
+          return;
+        }
+        setUser(user);
         setIsAuthenticated(true);
         // Redirect to dashboard when authenticated
         router.push('/dashboard');
@@ -84,6 +104,15 @@ export default function Home() {
       if (userData) {
         try {
           const user = JSON.parse(userData);
+          // Allow admin or team_member (project leaders are allowed via login check)
+          if (user.role !== 'admin' && user.role !== 'team_member') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            setIsAuthenticated(false);
+            setError("You don't have permission to visit admin");
+            return;
+          }
           setUser(user);
           setIsAuthenticated(true);
           // Redirect to dashboard when authenticated
@@ -204,6 +233,9 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
       const data = await response.json();
 
       if (data.success) {
+        // The API route already checks for admin or project leader status
+        // So if we get here, the user is allowed
+        
         // Save tokens and user data
         localStorage.setItem('accessToken', data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', data.data.tokens.refreshToken);

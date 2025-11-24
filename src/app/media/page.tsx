@@ -245,28 +245,83 @@ export default function MediaPage() {
     }
   };
 
-  const fetchUsersOnce = async () => {
-    if (users.length > 0) return;
+  const fetchUsersOnce = async (force = false) => {
+    if (users.length > 0 && !force) return;
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
-      const params = new URLSearchParams({ limit: '100' });
       
-      // Get backend URL from environment
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
-      console.log('Fetching users from backend URL:', backendUrl);
+      console.log('Fetching club members for media upload...');
+      
+      // Use club-members endpoint (accessible to any authenticated user, no role restriction)
+      // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
+      let allRawUsers: any[] = [];
+      const limit = 100;
+      let skip = 0;
+      let hasMore = true;
 
-      const res = await fetch(`${backendUrl}/api/users?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      // Fetch all club members with pagination
+      while (hasMore) {
+        const response = await fetch(`/api/users/club-members?limit=${limit}&skip=${skip}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+        console.log(`Media: Club-members API response status (skip=${skip}):`, response.status);
+
+        if (response.ok && data.success) {
+          const pageUsers = Array.isArray(data.data?.clubMembers) 
+            ? data.data.clubMembers 
+            : Array.isArray(data.clubMembers)
+            ? data.clubMembers
+            : [];
+          
+          console.log(`Media: Extracted ${pageUsers.length} club members from response`);
+          
+          allRawUsers = [...allRawUsers, ...pageUsers];
+          
+          // Check if there are more pages
+          const pagination = data.data?.pagination;
+          hasMore = pagination?.hasMore === true;
+          
+          // Stop if we've fetched a reasonable amount OR if pagination says no more
+          if (allRawUsers.length >= 500) {
+            hasMore = false;
+          } else if (pageUsers.length === 0 && !hasMore) {
+            hasMore = false;
+          }
+          
+          skip += limit;
+        } else {
+          console.error(`Media: Club-members API failed - status: ${response.status}`);
+          hasMore = false;
         }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Handle API response format: { success: true, data: { users: [] } }
-        const raw = data?.data?.users || data?.users || [];
-        if (Array.isArray(raw)) setUsers(raw);
+      }
+
+      console.log(`Media: Total club members fetched: ${allRawUsers.length}`);
+      
+      // Normalize user IDs and format
+      const normalizedUsers = allRawUsers.map((user: any) => {
+        const resolvedId = user.id || user._id || '';
+        return {
+          ...user,
+          id: resolvedId,
+          _id: resolvedId,
+          firstName: user.firstName || (user.fullName?.split(' ')[0]) || '',
+          lastName: user.lastName || (user.fullName?.split(' ').slice(1).join(' ')) || '',
+          email: user.email || '',
+          role: user.role || 'team_member'
+        } as SimpleUser;
+      }).filter(user => user.id); // Filter out users without valid IDs
+
+      if (normalizedUsers.length > 0) {
+        console.log(`Media: Setting ${normalizedUsers.length} normalized users`);
+        setUsers(normalizedUsers);
+      } else {
+        console.warn('Media: No users found after normalization');
       }
     } catch (e) {
       console.error('Failed to fetch users', e);
@@ -318,6 +373,13 @@ export default function MediaPage() {
       fetchProjectsOnce(true);
     }
   }, [showCreateCategory]);
+
+  // When the create modal opens, ensure users are loaded
+  useEffect(() => {
+    if (showCreate) {
+      fetchUsersOnce(true);
+    }
+  }, [showCreate]);
 
   const fetchMedia = async () => {
     try {
@@ -854,25 +916,58 @@ export default function MediaPage() {
                               preload="metadata"
                             />
                           ) : (
-                            (item.thumbnailUrl || item.fileUrl) ? (
-                              <>
-                                <Image
-                                  src={(item.thumbnailUrl || item.fileUrl).includes('cloudinary.com')
-                                    ? (item.thumbnailUrl || item.fileUrl).replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
-                                    : (item.thumbnailUrl || item.fileUrl)}
+                            (item.thumbnailUrl || item.fileUrl) ? (() => {
+                              const imageUrl = item.thumbnailUrl || item.fileUrl;
+                              const isCloudinary = imageUrl.includes('cloudinary.com');
+                              const isAllowedDomain = isCloudinary || imageUrl.includes('images.unsplash.com');
+                              
+                              // Use Next.js Image only for allowed domains
+                              if (isAllowedDomain) {
+                                return (
+                                  <Image
+                                    src={isCloudinary
+                                      ? imageUrl.replace(/\.(tiff|tif)$/i, '.jpg') + '?f_auto,q_auto'
+                                      : imageUrl}
+                                    alt={item.title}
+                                    width={64}
+                                    height={40}
+                                    className="h-10 w-16 object-cover"
+                                    onError={(e) => {
+                                      // Fallback to regular img if Next.js Image fails
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.nextElementSibling as HTMLImageElement;
+                                      if (fallback) {
+                                        fallback.style.display = 'block';
+                                      }
+                                    }}
+                                  />
+                                );
+                              }
+                              
+                              // Use regular img tag for external URLs
+                              return (
+                                <img
+                                  src={imageUrl}
                                   alt={item.title}
-                                  width={64}
-                                  height={40}
                                   className="h-10 w-16 object-cover"
+                                  onError={(e) => {
+                                    // Show icon if image fails to load
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling;
+                                    if (fallback) {
+                                      (fallback as HTMLElement).style.display = 'flex';
+                                    }
+                                  }}
                                 />
-                                <div className="h-10 w-16 items-center justify-center hidden" style={{ display: 'none' }}>
-                                  {iconForType('image')}
-                                </div>
-                              </>
-                            ) : (
+                              );
+                            })() : (
                               iconForType(item.fileType)
                             )
                           )}
+                          {/* Fallback icon (hidden by default) */}
+                          <div className="h-10 w-16 items-center justify-center hidden" style={{ display: 'none' }}>
+                            {iconForType(item.fileType === 'video' ? 'image' : item.fileType)}
+                          </div>
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -1066,16 +1161,25 @@ export default function MediaPage() {
                         onChange={e => setForm({ ...form, uploadedBy: e.target.value })}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900"
+                        disabled={users.length === 0}
                       >
-                        <option value="">Select user</option>
-                        {Array.isArray(users) && users.map((u) => {
-                          const uid = (u.id || u._id) as string;
+                        <option value="">
+                          {users.length === 0 ? 'Loading users...' : 'Select user'}
+                        </option>
+                        {Array.isArray(users) && users.length > 0 && users.map((u) => {
+                          const uid = u.id || u._id || '';
+                          if (!uid) return null;
                           const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || uid;
                           return (
-                            <option key={uid} value={uid}>{name}</option>
+                            <option key={uid} value={uid}>
+                              {name}{u.email ? ` (${u.email})` : ''}
+                            </option>
                           );
                         })}
                       </select>
+                      {users.length === 0 && (
+                        <p className="mt-1 text-xs text-gray-500">Loading users...</p>
+                      )}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -1328,14 +1432,34 @@ export default function MediaPage() {
 
         {showEdit && editForm && (
           <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowEdit(false)}></div>
+            <div className="absolute inset-0 bg-black/40" onClick={() => {
+              setShowEdit(false);
+              setError('');
+              setCreateError('');
+            }}></div>
             <div className="absolute inset-0 flex items-center justify-center p-4">
               <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                   <h3 className="text-lg font-medium text-gray-900">Edit Media</h3>
-                  <button onClick={() => setShowEdit(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                  <button onClick={() => {
+                    setShowEdit(false);
+                    setError('');
+                    setCreateError('');
+                  }} className="text-gray-500 hover:text-gray-700">✕</button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-700 mx-6 mt-4">
+                      <div className="flex items-start">
+                        <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                          <strong>Error:</strong> {error}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 <form id="edit-media-form" onSubmit={async (e) => {
                   e.preventDefault();
                   if (!editForm) return;
@@ -1358,11 +1482,9 @@ export default function MediaPage() {
                     if (editForm.fileUrl) {
                       payload.fileUrl = editForm.fileUrl;
                     }
-                    // Get backend URL from environment
-                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://newton-botics-server-phi.vercel.app';
-                    console.log('Updating media on backend URL:', backendUrl);
-
-                    const res = await fetch(`${backendUrl}/api/media/${editForm._id}`, {
+                    
+                    // Use Next.js API route instead of calling backend directly
+                    const res = await fetch(`/api/media/${editForm._id}`, {
                       method: 'PUT',
                       headers: {
                         'Authorization': `Bearer ${token}`,
@@ -1372,15 +1494,22 @@ export default function MediaPage() {
                     });
                     const data = await res.json();
                     if (!res.ok) {
-                      setError(extractErrorMessage(data) || 'Failed to update media');
+                      const errorMessage = extractErrorMessage(data) || 'Failed to update media';
+                      setError(errorMessage);
+                      // Also set createError for display in the modal
+                      setCreateError(errorMessage);
                       return;
                     }
                     setShowEdit(false);
                     setEditForm(null);
+                    setError(''); // Clear any previous errors
+                    setCreateError(''); // Clear create error too
                     fetchMedia();
                   } catch (err) {
                     console.error('Failed to update media', err);
-                    setError('Failed to update media');
+                    const errorMessage = err instanceof Error ? err.message : 'Failed to update media';
+                    setError(errorMessage);
+                    setCreateError(errorMessage);
                   } finally {
                     setEditLoading(false);
                   }
@@ -1511,7 +1640,11 @@ export default function MediaPage() {
                 </form>
                 </div>
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 flex-shrink-0">
-                  <button type="button" onClick={() => setShowEdit(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                  <button type="button" onClick={() => {
+                    setShowEdit(false);
+                    setError('');
+                    setCreateError('');
+                  }} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
                   <button type="submit" form="edit-media-form" disabled={editLoading} className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
                     {editLoading ? 'Saving...' : 'Save'}
                   </button>

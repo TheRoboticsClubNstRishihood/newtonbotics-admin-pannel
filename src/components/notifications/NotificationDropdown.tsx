@@ -6,10 +6,25 @@ import { NotificationList } from './NotificationList';
 export function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { count, refetch: refetchCount } = useNotificationCount();
   
+  // Check if user is admin
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setIsAdmin(user.role === 'admin');
+      } catch {
+        setIsAdmin(false);
+      }
+    }
+  }, []);
+  
   // Memoize the params to prevent unnecessary re-renders
-  const notificationParams = useMemo(() => ({ limit: 10 }), []);
+  // Only fetch notifications if user is admin (limit: 0 means don't fetch)
+  const notificationParams = useMemo(() => ({ limit: isAdmin ? 10 : 0 }), [isAdmin]);
   
   const { 
     notifications, 
@@ -34,9 +49,9 @@ export function NotificationDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Refresh count when dropdown is opened
+  // Refresh count when dropdown is opened (only for admins)
   const handleToggle = () => {
-    if (!isOpen) {
+    if (!isOpen && isAdmin) {
       refetchCount();
       refetchNotifications();
     }
@@ -54,6 +69,11 @@ export function NotificationDropdown() {
     // Refresh count after marking all as read
     refetchCount();
   };
+
+  // Don't show notification bell for non-admin users
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>

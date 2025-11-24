@@ -188,6 +188,7 @@ export function useNotificationSettings(): UseNotificationSettingsReturn {
 
 /**
  * Hook for getting notification count (for bell icon)
+ * Gracefully handles cases where user doesn't have admin access
  */
 export function useNotificationCount() {
   const [count, setCount] = useState(0);
@@ -195,13 +196,37 @@ export function useNotificationCount() {
 
   const fetchCount = useCallback(async () => {
     try {
+      // Check if user is admin before fetching
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          // Only fetch notifications for admin users
+          if (user.role !== 'admin') {
+            setCount(0);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // If we can't parse user data, try fetching anyway
+        }
+      }
+
       const response = await notificationService.getNotifications({ limit: 1 });
       
       if (response.success) {
         setCount(response.data.stats.unread);
       }
     } catch (err) {
-      console.error('Failed to fetch notification count:', err);
+      // Silently handle admin access errors - this is expected for non-admin users
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('Admin access required') || errorMessage.includes('403')) {
+        // Non-admin user, set count to 0
+        setCount(0);
+      } else {
+        // Other errors, log but don't throw
+        console.error('Failed to fetch notification count:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -210,10 +235,22 @@ export function useNotificationCount() {
   useEffect(() => {
     fetchCount();
     
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchCount, 30000);
+    // Only refresh count every 30 seconds if user is admin
+    const userData = localStorage.getItem('user');
+    let isAdmin = false;
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        isAdmin = user.role === 'admin';
+      } catch {
+        // If we can't parse, assume not admin
+      }
+    }
     
-    return () => clearInterval(interval);
+    if (isAdmin) {
+      const interval = setInterval(fetchCount, 30000);
+      return () => clearInterval(interval);
+    }
   }, [fetchCount]);
 
   return { count, loading, refetch: fetchCount };

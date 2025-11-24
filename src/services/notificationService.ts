@@ -32,17 +32,28 @@ export class NotificationService {
     });
 
     if (!response.ok) {
-      const errorData: NotificationApiError = await response.json().catch(() => ({
-        success: false,
-        error: {
-          message: `HTTP error! status: ${response.status}`,
-          details: { statusCode: response.status, isOperational: true }
-        },
-        timestamp: new Date().toISOString(),
-        path: endpoint,
-        method: options.method || 'GET'
-      }));
-      throw new Error(errorData.error.message);
+      let errorData: NotificationApiError | any;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = {
+          success: false,
+          error: {
+            message: `HTTP error! status: ${response.status}`,
+            details: { statusCode: response.status, isOperational: true }
+          },
+          timestamp: new Date().toISOString(),
+          path: endpoint,
+          method: options.method || 'GET'
+        };
+      }
+      
+      // Safely extract error message with fallbacks
+      const errorMessage = errorData?.error?.message 
+        || errorData?.message 
+        || `HTTP error! status: ${response.status}`;
+      
+      throw new Error(errorMessage);
     }
 
     return response.json();
