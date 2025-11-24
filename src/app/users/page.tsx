@@ -62,11 +62,13 @@ interface UserStatistics {
   }>;
 }
 
+const USERS_PER_PAGE = 20;
+
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
-    limit: 20,
+    limit: USERS_PER_PAGE,
     skip: 0,
     hasMore: false
   });
@@ -75,9 +77,11 @@ export default function Users() {
   const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -90,6 +94,19 @@ export default function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchQuery, selectedRole, selectedDepartment, currentPage]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
@@ -98,12 +115,18 @@ export default function Users() {
         return;
       }
 
+      setErrorMessage(null);
+
+      const limit = USERS_PER_PAGE;
+      const skip = (currentPage - 1) * limit;
+
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: '20'
+        limit: limit.toString()
       });
+      params.append('skip', skip.toString());
 
-      if (searchQuery) params.append('q', searchQuery);
+      if (debouncedSearchQuery) params.append('q', debouncedSearchQuery);
       if (selectedRole) params.append('role', selectedRole);
       if (selectedDepartment) params.append('department', selectedDepartment);
 
@@ -118,15 +141,27 @@ export default function Users() {
         const data = await response.json();
         setUsers(data.data.users);
         setPagination(data.data.pagination);
-      } else {
-        console.error('Failed to fetch users');
+        setErrorMessage(null);
+        return;
       }
+
+      const errorBody = await response.json().catch(() => null);
+      const retryAfter = response.headers.get('Retry-After');
+      if (response.status === 429) {
+        const retryText = retryAfter ? `${retryAfter} seconds` : 'a moment';
+        setErrorMessage(`Too many requests. Please wait ${retryText} and try again.`);
+      } else {
+        const message = errorBody?.message || errorBody?.error || 'Failed to fetch users';
+        setErrorMessage(message);
+      }
+      console.error('Failed to fetch users', { status: response.status, body: errorBody });
     } catch (error) {
       console.error('Error fetching users:', error);
+      setErrorMessage('Unable to load users. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchQuery, selectedRole, selectedDepartment]);
+  }, [currentPage, debouncedSearchQuery, selectedRole, selectedDepartment]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -390,7 +425,11 @@ export default function Users() {
               {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${
+                  showFilters
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
               >
                 <FunnelIcon className="w-4 h-4" />
                 <span>Filters</span>
@@ -446,6 +485,13 @@ export default function Users() {
             )}
           </div>
         </div>
+
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
 
         {/* Users Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -581,14 +627,14 @@ export default function Users() {
             <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
               <div className="flex-1 flex justify-between sm:hidden">
                 <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                   className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => setCurrentPage(currentPage + 1)}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
                   disabled={!pagination.hasMore}
                   className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                 >
@@ -608,14 +654,14 @@ export default function Users() {
                 <div>
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                     <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                       className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       <ChevronLeftIcon className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setCurrentPage(currentPage + 1)}
+                      onClick={() => setCurrentPage((prev) => prev + 1)}
                       disabled={!pagination.hasMore}
                       className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
