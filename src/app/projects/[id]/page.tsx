@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import TeamAnalytics from '@/components/TeamAnalytics';
+import ProjectMediaForm from '@/components/ProjectMediaForm';
 import { canManageProject, getCurrentUser } from '@/lib/projectPermissions';
 import { 
   ArrowLeftIcon,
@@ -18,7 +19,9 @@ import {
   CodeBracketIcon,
   DocumentTextIcon,
   TrophyIcon,
-  HashtagIcon
+  HashtagIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 
 interface Project {
@@ -124,6 +127,7 @@ export default function ProjectDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
+  const [showMediaForm, setShowMediaForm] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id?: string; _id?: string; role?: string; email?: string } | null>(null);
   const [teamMemberDetails, setTeamMemberDetails] = useState<Map<string, TeamMemberDetails>>(new Map());
 
@@ -1183,8 +1187,21 @@ export default function ProjectDetailsPage() {
 
             {/* Resources */}
             <div className="bg-white shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-medium text-gray-900">Resources</h3>
+                {canManageProject(project as any, currentUser) && (
+                  <button
+                    onClick={() => setShowMediaForm(!showMediaForm)}
+                    className="text-sm text-indigo-600 hover:text-indigo-900 flex items-center space-x-1"
+                  >
+                    <span>Manage Media</span>
+                    {showMediaForm ? (
+                      <ChevronUpIcon className="w-4 h-4" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
               <div className="px-6 py-4 space-y-3">
                 {project.imageUrl && (
@@ -1239,6 +1256,33 @@ export default function ProjectDetailsPage() {
                   <p className="text-gray-500 text-sm">No resources available</p>
                 )}
               </div>
+              
+              {/* Media Management Form */}
+              {showMediaForm && canManageProject(project as any, currentUser) && (
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <ProjectMediaForm
+                    projectId={project.id || (params.id as string)}
+                    initialMedia={{
+                      imageUrl: project.imageUrl,
+                      videoUrl: project.videoUrl,
+                      githubUrl: project.githubUrl,
+                      documentationUrl: project.documentationUrl,
+                    }}
+                    onSuccess={(media) => {
+                      // Update project state with new media
+                      setProject({
+                        ...project,
+                        ...media
+                      });
+                      // Optionally close the form after success
+                      // setShowMediaForm(false);
+                    }}
+                    onError={(error) => {
+                      console.error('Error updating media:', error);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

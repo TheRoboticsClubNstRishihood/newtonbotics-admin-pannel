@@ -26,9 +26,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { NotificationDropdown } from './notifications/NotificationDropdown';
 import DeveloperCredit from './DeveloperCredit';
+import { isUserProjectLeader } from '@/lib/projectPermissions';
 
 interface User {
-  id: string;
+  id?: string;
+  _id?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -49,6 +51,7 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children, pageTitle = "Dashboard" }: AdminLayoutProps) {
   const [user, setUser] = useState<User | null>(null);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [isProjectLeader, setIsProjectLeader] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -72,6 +75,16 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
         return;
       }
       setUser(user);
+      
+      // Check if user is a project leader (for team_member users)
+      if (user.role === 'team_member' && token) {
+        const userId = user.id || user._id || '';
+        if (userId) {
+          isUserProjectLeader(userId, token)
+            .then(setIsProjectLeader)
+            .catch(() => setIsProjectLeader(false));
+        }
+      }
     } catch (error) {
       console.error('Error parsing user data:', error);
       window.location.href = '/';
@@ -120,8 +133,13 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
   ];
 
   // For team_member users, only Projects is enabled
+  // Project leaders can also access Media
   const isAdmin = user?.role === 'admin';
-  const enabledMenuItems = isAdmin ? allMenuItems.map(item => item.href) : ['/projects'];
+  const enabledMenuItems = isAdmin 
+    ? allMenuItems.map(item => item.href) 
+    : isProjectLeader 
+      ? ['/projects', '/media'] 
+      : ['/projects'];
 
   // Define admin-only routes (team_member users cannot access these)
   const adminOnlyRoutes = [
@@ -145,9 +163,11 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
   ];
 
   // Routes that team_member users CAN access (including all project-related routes)
+  // Project leaders can also access Media
   const teamMemberAllowedRoutes = [
     '/projects',  // This will match /projects, /projects/create, /projects/edit/[id], /projects/[id]
-    '/profile'
+    '/profile',
+    ...(isProjectLeader ? ['/media'] : [])  // Project leaders can access media
   ];
 
   // Check if current route is admin-only and user is not admin
