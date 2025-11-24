@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrl } from '@/config/backend';
+import { verifyAdminAccess } from '@/lib/adminAuth';
 
 const backendUrl = getBackendUrl();
 
@@ -9,6 +10,15 @@ export async function GET(request: NextRequest) {
     const token = request.headers.get('authorization');
     if (!token) {
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
+    }
+
+    // Verify admin access
+    const adminUser = await verifyAdminAccess(token, backendUrl);
+    if (!adminUser) {
+      return NextResponse.json(
+        { success: false, message: 'Admin access required' },
+        { status: 403 }
+      );
     }
 
     console.log('🔔 Notification Settings API - GET request received');
@@ -47,6 +57,15 @@ export async function PUT(request: NextRequest) {
     const token = request.headers.get('authorization');
     if (!token) {
       return NextResponse.json({ success: false, message: 'No authorization token provided' }, { status: 401 });
+    }
+
+    // Verify admin access
+    const adminUser = await verifyAdminAccess(token, backendUrl);
+    if (!adminUser) {
+      return NextResponse.json(
+        { success: false, message: 'Admin access required' },
+        { status: 403 }
+      );
     }
 
     console.log('🔔 Update Notification Settings API - PUT request received');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { 
@@ -31,6 +31,8 @@ export default function CreateProjectPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
   const formatUserLabel = (u: Partial<User>) => {
     const first = typeof u.firstName === 'string' ? u.firstName : '';
     const last = typeof u.lastName === 'string' ? u.lastName : '';
@@ -71,24 +73,189 @@ export default function CreateProjectPage() {
 
   useEffect(() => {
     fetchUsers();
+    
+    // If current user is a team_member project leader, pre-select them as team leader
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const currentUser = JSON.parse(userData);
+        const userId = currentUser.id || currentUser._id;
+        const userRole = (currentUser.role || '').toLowerCase().trim();
+        
+        // If current user is a team_member, admin, or mentor, pre-select them as team leader
+        if (userId && (userRole === 'team_member' || userRole === 'admin' || userRole === 'mentor' || userRole === 'researcher')) {
+          setFormData(prev => ({
+            ...prev,
+            teamLeaderId: userId
+          }));
+          
+          // Also add current user to users list if not already there (fallback)
+          setUsers(prev => {
+            const exists = prev.some(u => (u.id || (u as { _id?: string })._id) === userId);
+            if (!exists) {
+              return [...prev, {
+                id: userId,
+                _id: userId,
+                firstName: currentUser.firstName || '',
+                lastName: currentUser.lastName || '',
+                email: currentUser.email || '',
+                role: currentUser.role || 'team_member'
+              } as User];
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
   }, []);
 
   const fetchUsers = async () => {
     try {
+      setUsersLoading(true);
+      setUsersError(null);
       const token = localStorage.getItem('accessToken');
-      const response = await fetch('/api/users?limit=100', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      
+      if (!token) {
+        setUsersError('No authentication token found');
+        setUsersLoading(false);
+        return;
+      }
 
-      const data = await response.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
+      // Try club-members endpoint first (accessible to any authenticated user, no role restriction)
+      // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
+      // Fetch all club members with pagination
+      console.log('Fetching all club members with pagination...');
+      let allRawUsers: any[] = [];
+      const limit = 100;
+      let skip = 0;
+      let hasMore = true;
+      let response: Response;
+      let data: any;
+      let clubMembersSuccess = false;
+
+      // Fetch all club members with pagination
+      while (hasMore) {
+        console.log(`Fetching club members: limit=${limit}, skip=${skip}`);
+        response = await fetch(`/api/users/club-members?limit=${limit}&skip=${skip}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        data = await response.json();
+        console.log(`Club-members API response status (skip=${skip}):`, response.status);
+        console.log(`Club-members API response data:`, data);
+
+        if (response.ok && data.success) {
+          clubMembersSuccess = true;
+          // Extract club members from response
+          const pageUsers = Array.isArray(data.data?.clubMembers) 
+            ? data.data.clubMembers 
+            : Array.isArray(data.clubMembers)
+            ? data.clubMembers
+            : [];
+          
+          console.log(`Extracted ${pageUsers.length} club members from response`);
+          console.log(`Response structure - data.data?.clubMembers:`, Array.isArray(data.data?.clubMembers) ? data.data.clubMembers.length : 'not array');
+          console.log(`Response structure - data.clubMembers:`, Array.isArray(data.clubMembers) ? data.clubMembers.length : 'not array');
+          console.log(`Full response keys:`, Object.keys(data));
+          if (data.data) {
+            console.log(`data.data keys:`, Object.keys(data.data));
+          }
+          
+          allRawUsers = [...allRawUsers, ...pageUsers];
+          console.log(`Fetched ${pageUsers.length} club members (total so far: ${allRawUsers.length})`);
+          
+          // Check if there are more pages
+          const pagination = data.data?.pagination;
+          hasMore = pagination?.hasMore === true;
+          console.log(`Pagination info:`, pagination);
+          console.log(`hasMore: ${hasMore}, pageUsers.length: ${pageUsers.length}`);
+          
+          // Only stop if we've fetched a reasonable amount OR if pagination says no more
+          // Don't stop just because first page is empty - might be a response structure issue
+          if (allRawUsers.length >= 500) {
+            hasMore = false;
+          } else if (pageUsers.length === 0 && !hasMore) {
+            // Only stop if no more pages AND no users on this page
+            hasMore = false;
+          }
+          
+          skip += limit;
+        } else {
+          console.error(`Club-members API failed - status: ${response.status}, success: ${data.success}`);
+          console.error(`Error message:`, data.message || data.error?.message || data.error || 'Unknown error');
+          console.error(`Full error response:`, data);
+          hasMore = false;
+        }
+      }
+
+      const rawUsers = allRawUsers;
+      console.log('Total club members fetched:', rawUsers.length);
+      
+      // If club-members returned no data, log the full response for debugging
+      if (!clubMembersSuccess || rawUsers.length === 0) {
+        console.error('Club-members endpoint returned no data. Full response:', data);
+      }
+
+      // Normalize user IDs to handle both id and _id fields
+      const normalizedUsers = rawUsers.map((user: Record<string, unknown>) => {
+        const resolvedId = typeof user.id === 'string' && user.id
+          ? user.id
+          : typeof (user as { _id?: string })._id === 'string' && (user as { _id?: string })._id
+            ? (user as { _id?: string })._id
+            : typeof (user as { userId?: string }).userId === 'string' && (user as { userId?: string }).userId
+              ? (user as { userId?: string }).userId
+              : '';
+        return {
+          ...user,
+          id: resolvedId || undefined,
+          _id: (user as { _id?: string })._id || resolvedId || undefined,
+          firstName: (user.firstName as string) || ((user.fullName as string)?.split(' ')[0]) || '',
+          lastName: (user.lastName as string) || ((user.fullName as string)?.split(' ').slice(1).join(' ')) || '',
+          email: (user.email as string) || '',
+          role: (user.role as string) || 'team_member'
+        } as User;
+      }).filter(user => user.id); // Filter out users without valid IDs
+
+      console.log('Normalized users count:', normalizedUsers.length);
+      
+      if (normalizedUsers.length > 0) {
+        setUsers(normalizedUsers);
+      } else {
+        // If no users fetched, add current user as fallback
+        console.warn('No users fetched, adding current user as fallback');
+        try {
+          const userData = localStorage.getItem('user');
+          if (userData) {
+            const currentUser = JSON.parse(userData);
+            const userId = currentUser.id || currentUser._id;
+            if (userId) {
+              const fallbackUser: User = {
+                id: userId,
+                _id: userId,
+                firstName: currentUser.firstName || '',
+                lastName: currentUser.lastName || '',
+                email: currentUser.email || '',
+                role: currentUser.role || 'team_member'
+              };
+              setUsers([fallbackUser]);
+              console.log('Added current user as fallback:', fallbackUser);
+            }
+          }
+        } catch (error) {
+          console.error('Error adding current user fallback:', error);
+        }
+        setUsersError('Unable to fetch users. Only current user available.');
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsersError(error instanceof Error ? error.message : 'Failed to fetch users');
+    } finally {
+      setUsersLoading(false);
     }
   };
 
@@ -438,12 +605,31 @@ export default function CreateProjectPage() {
     }
   };
 
-  const mentors = users.filter(user => user.role === 'mentor' || user.role === 'admin');
-  const teamLeaders = users.filter(user => 
-    user.role === 'team_leader' || 
-    user.role === 'admin' || 
-    user.role === 'team_member'
-  );
+  const mentors = useMemo(() => {
+    return users.filter(user => {
+      const role = (user.role || '').toLowerCase().trim();
+      return role === 'mentor' || role === 'admin' || role === 'researcher';
+    });
+  }, [users]);
+  
+  const teamLeaders = useMemo(() => {
+    // Show ALL club members as potential team leaders (any authenticated user can be a team leader)
+    // Filter only to ensure users have valid IDs
+    const filtered = users.filter(user => {
+      const userId = user.id || (user as { _id?: string })._id || '';
+      return userId; // Include all users with valid IDs
+    });
+    
+    // Debug logging
+    if (users.length > 0 || filtered.length > 0) {
+      console.log('Total users fetched:', users.length);
+      console.log('Users with roles:', users.map(u => ({ id: u.id, role: u.role, name: formatUserLabel(u) })));
+      console.log('Team leaders (all club members):', filtered.length);
+      console.log('Team leaders details:', filtered.map(u => ({ id: u.id, role: u.role, name: formatUserLabel(u) })));
+    }
+    
+    return filtered;
+  }, [users]);
 
   return (
     <AdminLayout pageTitle="Create Project">
@@ -680,20 +866,60 @@ export default function CreateProjectPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Team Leader *
                 </label>
-                <select
-                  name="teamLeaderId"
-                  value={formData.teamLeaderId}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">Select Team Leader</option>
-                  {teamLeaders.map(user => (
-                    <option key={String(user.id)} value={String(user.id)}>
-                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
-                    </option>
-                  ))}
-                </select>
+                {usersLoading ? (
+                  <div className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-500 bg-gray-50">
+                    Loading users...
+                  </div>
+                ) : usersError ? (
+                  <div className="w-full border border-red-300 rounded-md px-3 py-2 text-red-600 bg-red-50">
+                    Error: {usersError}
+                    <button 
+                      type="button"
+                      onClick={fetchUsers}
+                      className="ml-2 text-sm underline hover:text-red-800"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      name="teamLeaderId"
+                      value={formData.teamLeaderId}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Select Team Leader</option>
+                      {teamLeaders.map(user => {
+                        const userId = user.id || (user as { _id?: string })._id || '';
+                        if (!userId) return null;
+                        return (
+                          <option key={userId} value={userId}>
+                            {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {teamLeaders.length === 0 && !usersLoading && (
+                      <div className="mt-1">
+                        <p className="text-sm text-amber-600">
+                          No team leaders available. Found {users.length} total users.
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Team leaders must have role: team_member, team_leader, or admin
+                        </p>
+                        <button 
+                          type="button"
+                          onClick={fetchUsers}
+                          className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 underline"
+                        >
+                          Refresh Users
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Mentor */}
@@ -701,19 +927,33 @@ export default function CreateProjectPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mentor
                 </label>
-                <select
-                  name="mentorId"
-                  value={formData.mentorId}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">Select Mentor (Optional)</option>
-                  {mentors.map(user => (
-                    <option key={String(user.id)} value={String(user.id)}>
-                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
-                    </option>
-                  ))}
-                </select>
+                {usersLoading ? (
+                  <div className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-500 bg-gray-50">
+                    Loading users...
+                  </div>
+                ) : usersError ? (
+                  <div className="w-full border border-red-300 rounded-md px-3 py-2 text-red-600 bg-red-50">
+                    Error: {usersError}
+                  </div>
+                ) : (
+                  <select
+                    name="mentorId"
+                    value={formData.mentorId}
+                    onChange={handleInputChange}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select Mentor (Optional)</option>
+                    {mentors.map(user => {
+                      const userId = user.id || (user as { _id?: string })._id || '';
+                      if (!userId) return null;
+                      return (
+                        <option key={userId} value={userId}>
+                          {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
             </div>
           </div>

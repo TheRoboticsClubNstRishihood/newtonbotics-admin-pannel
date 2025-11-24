@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
+import { canManageProject, getCurrentUser } from '@/lib/projectPermissions';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon, 
@@ -74,6 +75,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; _id?: string; role?: string } | null>(null);
   const [filters, setFilters] = useState<ProjectFilters>({
     search: '',
     status: '',
@@ -94,6 +96,19 @@ export default function ProjectsPage() {
     onHold: 0
   });
 
+  // Initialize user
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+  }, []);
+
   const fetchProjects = async () => {
     try {
       setLoading(true);
@@ -109,6 +124,7 @@ export default function ProjectsPage() {
       if (filters.category) queryParams.append('category', filters.category);
       if (filters.mentorId) queryParams.append('mentorId', filters.mentorId);
       if (filters.teamLeaderId) queryParams.append('teamLeaderId', filters.teamLeaderId);
+      
       queryParams.append('limit', '20');
       queryParams.append('skip', ((currentPage - 1) * 20).toString());
       queryParams.append('sort', 'createdAt');
@@ -194,9 +210,11 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => {
-    fetchProjects();
-    fetchStatistics();
-  }, [currentPage, filters]);
+    if (currentUser) {
+      fetchProjects();
+      fetchStatistics();
+    }
+  }, [currentPage, filters, currentUser]);
 
   const handleFilterChange = (key: keyof ProjectFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -286,13 +304,15 @@ export default function ProjectsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
             <p className="text-gray-600">Manage and track all projects</p>
           </div>
-          <Link 
-            href="/projects/create"
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center space-x-2"
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span>Create Project</span>
-          </Link>
+          {currentUser?.role === 'admin' && (
+            <Link 
+              href="/projects/create"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center space-x-2"
+            >
+              <PlusIcon className="w-5 h-5" />
+              <span>Create Project</span>
+            </Link>
+          )}
         </div>
 
         {/* Stats */}
@@ -440,47 +460,65 @@ export default function ProjectsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50">
+                {projects.map((project) => {
+                  const canManage = canManageProject(project, currentUser);
+                  const isDisabled = currentUser?.role === 'team_member' && !canManage;
+                  
+                  return (
+                  <tr 
+                    key={project.id} 
+                    className={`${isDisabled ? 'opacity-60 bg-gray-50' : 'hover:bg-gray-50'}`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{project.title}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
+                        {canManage ? (
+                          <Link 
+                            href={`/projects/${project.id}`}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+                          >
+                            {project.title}
+                          </Link>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-400 cursor-not-allowed" title="You don't have permission to access this project">
+                            {project.title}
+                          </div>
+                        )}
+                        <div className={`text-sm truncate max-w-xs ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
                           {project.description}
                         </div>
                         {project.category && (
                           <div className="flex items-center mt-1">
-                            <TagIcon className="w-4 h-4 text-gray-400 mr-1" />
-                            <span className="text-xs text-gray-500">{project.category}</span>
+                            <TagIcon className={`w-4 h-4 mr-1 ${isDisabled ? 'text-gray-300' : 'text-gray-400'}`} />
+                            <span className={`text-xs ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>{project.category}</span>
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isDisabled ? 'opacity-60' : ''} ${getStatusColor(project.status)}`}>
                         {project.status.replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className={`px-6 py-4 whitespace-nowrap ${isDisabled ? 'text-gray-400' : ''}`}>
                       {project.teamLeader ? (
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm">
                           {project.teamLeader.firstName} {project.teamLeader.lastName}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-500">Not assigned</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className={`px-6 py-4 whitespace-nowrap ${isDisabled ? 'text-gray-400' : ''}`}>
                       {project.mentor ? (
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm">
                           {project.mentor.firstName} {project.mentor.lastName}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-500">Not assigned</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <td className={`px-6 py-4 whitespace-nowrap ${isDisabled ? 'text-gray-400' : ''}`}>
+                      <div className="text-sm">
                         {project.allTeamMembers ? (
                           <div>
                             <div className="font-medium">{project.allTeamMembers.filter(m => m.isActive).length} active</div>
@@ -493,19 +531,19 @@ export default function ProjectsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {project.priority && (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(project.priority)}`}>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isDisabled ? 'opacity-60' : ''} ${getPriorityColor(project.priority)}`}>
                           {project.priority.toUpperCase()}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {project.difficulty && (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getDifficultyColor(project.difficulty)}`}>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isDisabled ? 'opacity-60' : ''} ${getDifficultyColor(project.difficulty)}`}>
                           {project.difficulty.toUpperCase()}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className={`px-6 py-4 whitespace-nowrap ${isDisabled ? 'opacity-60' : ''}`}>
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
@@ -513,10 +551,10 @@ export default function ProjectsPage() {
                             style={{ width: `${project.progress || 0}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-900">{project.progress || 0}%</span>
+                        <span className="text-sm">{project.progress || 0}%</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
                       <div className="flex items-center">
                         <CalendarIcon className="w-4 h-4 mr-1" />
                         <div>
@@ -531,28 +569,43 @@ export default function ProjectsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        <a 
-                          href={`/projects/${project.id}`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          <EyeIcon className="w-5 h-5" />
-                        </a>
-                        <a 
-                          href={`/projects/edit/${project.id}`}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          <PencilIcon className="w-5 h-5" />
-                        </a>
-                        <button 
-                          onClick={() => handleDeleteProject(project.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
+                        {canManage ? (
+                          <>
+                            <a 
+                              href={`/projects/${project.id}`}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="View project"
+                            >
+                              <EyeIcon className="w-5 h-5" />
+                            </a>
+                            <a 
+                              href={`/projects/edit/${project.id}`}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Edit project"
+                            >
+                              <PencilIcon className="w-5 h-5" />
+                            </a>
+                            {currentUser?.role === 'admin' && (
+                              <button 
+                                onClick={() => handleDeleteProject(project.id)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Delete project"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center space-x-2 opacity-50 cursor-not-allowed" title="You don't have permission to access this project">
+                            <EyeIcon className="w-5 h-5 text-gray-400" />
+                            <PencilIcon className="w-5 h-5 text-gray-400" />
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

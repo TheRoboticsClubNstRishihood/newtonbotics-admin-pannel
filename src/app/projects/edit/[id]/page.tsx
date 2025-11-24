@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
+import { canManageProject, getCurrentUser, getUserId, getProjectLeaderId, isProjectLeader } from '@/lib/projectPermissions';
 import { 
   ArrowLeftIcon,
   CurrencyDollarIcon,
@@ -17,9 +18,11 @@ import {
 import CloudinaryUploader from '@/components/CloudinaryUploader';
 
 interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
+  id?: string;
+  _id?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
   email: string;
   role: string;
 }
@@ -61,6 +64,8 @@ export default function EditProjectPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [project, setProject] = useState<Project | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; _id?: string; role?: string; email?: string } | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [existingMembers, setExistingMembers] = useState<Array<{
     id?: string;
     userId?: string;
@@ -73,19 +78,24 @@ export default function EditProjectPage() {
     contribution?: string;
   }>>([]);
 
+  const getUserId = (u: Partial<User> | undefined | null) => {
+    if (!u) return '';
+    return (typeof u.id === 'string' && u.id) || (typeof u._id === 'string' && u._id) || '';
+  };
+
   const formatUserLabel = (u: Partial<User>) => {
     const first = typeof u.firstName === 'string' ? u.firstName : '';
     const last = typeof u.lastName === 'string' ? u.lastName : '';
     const email = typeof u.email === 'string' ? u.email : '';
     const name = `${first} ${last}`.trim();
-    return name || email || String((u as { id?: string }).id || '');
+    return name || email || getUserId(u);
   };
 
   const getMemberDisplay = (m: { user?: Partial<User>; userId?: unknown }) => {
     const userObj = m.user as Partial<User> | undefined;
     const idFromObj = (m.userId as { id?: string } | undefined)?.id;
     const idFromStr = typeof m.userId === 'string' ? m.userId : (typeof idFromObj === 'string' ? idFromObj : '');
-    const fallback = users.find(u => u.id === idFromStr);
+    const fallback = users.find(u => getUserId(u) === idFromStr);
     const label = userObj ? formatUserLabel(userObj) : (fallback ? formatUserLabel(fallback) : '');
     const email = userObj?.email || fallback?.email || '';
     return { label, email, userIdStr: idFromStr };
@@ -185,6 +195,10 @@ export default function EditProjectPage() {
   const [savingMilestoneId, setSavingMilestoneId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Get current user from localStorage
+    const user = getCurrentUser();
+    setCurrentUser(user);
+    
     fetchUsers();
     if (params.id) {
       fetchProject();
@@ -195,20 +209,154 @@ export default function EditProjectPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch('/api/users?limit=100', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      if (!token) return;
 
-      const data = await response.json();
-      if (data.success) {
-        setUsers(data.data.users || []);
+      // Try club-members endpoint first (accessible to any authenticated user, no role restriction)
+      // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
+      // Fetch all club members with pagination
+      console.log('Edit Project: Fetching all club members with pagination...');
+      let allRawUsers: any[] = [];
+      const limit = 100;
+      let skip = 0;
+      let hasMore = true;
+      let response: Response;
+      let data: any;
+      let clubMembersSuccess = false;
+
+      // Fetch all club members with pagination
+      while (hasMore) {
+        console.log(`Edit Project: Fetching club members: limit=${limit}, skip=${skip}`);
+        response = await fetch(`/api/users/club-members?limit=${limit}&skip=${skip}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        data = await response.json();
+        console.log(`Edit Project: Club-members API response status (skip=${skip}):`, response.status);
+        console.log(`Edit Project: Club-members API response data:`, data);
+
+        if (response.ok && data.success) {
+          clubMembersSuccess = true;
+          const pageUsers = Array.isArray(data.data?.clubMembers) 
+            ? data.data.clubMembers 
+            : Array.isArray(data.clubMembers)
+            ? data.clubMembers
+            : [];
+          
+          console.log(`Edit Project: Extracted ${pageUsers.length} club members from response`);
+          console.log(`Edit Project: Response structure - data.data?.clubMembers:`, Array.isArray(data.data?.clubMembers) ? data.data.clubMembers.length : 'not array');
+          console.log(`Edit Project: Response structure - data.clubMembers:`, Array.isArray(data.clubMembers) ? data.clubMembers.length : 'not array');
+          console.log(`Edit Project: Full response keys:`, Object.keys(data));
+          if (data.data) {
+            console.log(`Edit Project: data.data keys:`, Object.keys(data.data));
+          }
+          
+          allRawUsers = [...allRawUsers, ...pageUsers];
+          console.log(`Edit Project: Fetched ${pageUsers.length} club members (total so far: ${allRawUsers.length})`);
+          
+          // Check if there are more pages
+          const pagination = data.data?.pagination;
+          hasMore = pagination?.hasMore === true;
+          console.log(`Edit Project: Pagination info:`, pagination);
+          console.log(`Edit Project: hasMore: ${hasMore}, pageUsers.length: ${pageUsers.length}`);
+          
+          // Only stop if we've fetched a reasonable amount OR if pagination says no more
+          // Don't stop just because first page is empty - might be a response structure issue
+          if (allRawUsers.length >= 500) {
+            hasMore = false;
+          } else if (pageUsers.length === 0 && !hasMore) {
+            // Only stop if no more pages AND no users on this page
+            hasMore = false;
+          }
+          
+          skip += limit;
+        } else {
+          console.error(`Edit Project: Club-members API failed - status: ${response.status}, success: ${data.success}`);
+          console.error(`Edit Project: Error message:`, data.message || data.error?.message || data.error || 'Unknown error');
+          console.error(`Edit Project: Full error response:`, data);
+          hasMore = false;
+        }
+      }
+
+      const rawUsers = allRawUsers;
+      console.log('Edit Project: Total club members fetched:', rawUsers.length);
+      
+      // If club-members returned no data, log the full response for debugging
+      if (!clubMembersSuccess || rawUsers.length === 0) {
+        console.error('Edit Project: Club-members endpoint returned no data. Full response:', data);
+      }
+
+      // Normalize user IDs
+      const normalizedUsers = rawUsers.map((user: Record<string, unknown>) => {
+        const resolvedId = typeof user.id === 'string' && user.id
+          ? user.id
+          : typeof (user as { _id?: string })._id === 'string' && (user as { _id?: string })._id
+            ? (user as { _id?: string })._id
+            : typeof (user as { userId?: string }).userId === 'string' && (user as { userId?: string }).userId
+              ? (user as { userId?: string }).userId
+              : '';
+        return {
+          ...user,
+          id: resolvedId || undefined,
+          _id: (user as { _id?: string })._id || resolvedId || undefined,
+          firstName: (user.firstName as string) || ((user.fullName as string)?.split(' ')[0]) || '',
+          lastName: (user.lastName as string) || ((user.fullName as string)?.split(' ').slice(1).join(' ')) || '',
+          email: user.email || '',
+          role: user.role || 'team_member'
+        } as User;
+      }).filter(user => user.id); // Filter out users without valid IDs
+
+      if (normalizedUsers.length > 0) {
+        setUsers(normalizedUsers);
+      } else {
+        // Add current user as fallback
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          const userId = getUserId(currentUser);
+          if (userId) {
+            setUsers([{
+              id: userId,
+              _id: userId,
+              firstName: (currentUser as any).firstName || '',
+              lastName: (currentUser as any).lastName || '',
+              email: (currentUser as any).email || '',
+              role: currentUser.role || 'team_member'
+            } as User]);
+            console.log('Edit Project: Added current user as fallback');
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+      // Add current user as fallback on error
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        const userId = getUserId(currentUser);
+        if (userId) {
+          const userAny = currentUser as any;
+          setUsers([{
+            id: userId,
+            _id: userId,
+            firstName: userAny.firstName || '',
+            lastName: userAny.lastName || '',
+            email: userAny.email || '',
+            role: currentUser.role || 'team_member'
+          } as User]);
+        }
+      }
     }
+  };
+
+  const extractUserId = (value: unknown): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      const candidate = value as { id?: string; _id?: string };
+      return candidate.id || candidate._id || '';
+    }
+    return '';
   };
 
   const fetchProject = async () => {
@@ -229,6 +377,12 @@ export default function EditProjectPage() {
         const raw = (data?.data && (data.data.project || data.data)) || data.project || data.item || {};
         console.log('EditProjectPage: normalized projectData', raw);
         setProject(raw);
+        
+        // Check if user has permission to edit
+        const user = getCurrentUser();
+        if (!canManageProject(raw, user)) {
+          setAccessError('You do not have permission to manage this project. Only project leaders, mentors, or admins can edit projects.');
+        }
         // Extract milestones if present
         const rawMilestones = Array.isArray((raw as unknown as { milestones?: Milestone[] }).milestones)
           ? (raw as unknown as { milestones: Milestone[] }).milestones
@@ -242,12 +396,8 @@ export default function EditProjectPage() {
           startDate: raw.startDate ? String(raw.startDate).split('T')[0] : '',
           endDate: raw.endDate ? String(raw.endDate).split('T')[0] : '',
           budget: raw.budget != null ? String(raw.budget) : '',
-          mentorId: typeof (raw as { mentorId?: string; mentor?: { id?: string } }).mentorId === 'string' 
-            ? (raw as { mentorId?: string }).mentorId! 
-            : ((raw as { mentorId?: { id?: string }; mentor?: { id?: string } }).mentorId?.id || (raw as { mentor?: { id?: string } }).mentor?.id || ''),
-          teamLeaderId: typeof (raw as { teamLeaderId?: string; teamLeader?: { id?: string } }).teamLeaderId === 'string' 
-            ? (raw as { teamLeaderId?: string }).teamLeaderId! 
-            : ((raw as { teamLeaderId?: { id?: string }; teamLeader?: { id?: string } }).teamLeaderId?.id || (raw as { teamLeader?: { id?: string } }).teamLeader?.id || ''),
+          mentorId: extractUserId((raw as { mentorId?: unknown }).mentorId ?? (raw as { mentor?: unknown }).mentor),
+          teamLeaderId: extractUserId((raw as { teamLeaderId?: unknown }).teamLeaderId ?? (raw as { teamLeader?: unknown }).teamLeader),
           imageUrl: raw.imageUrl ?? '',
           videoUrl: raw.videoUrl ?? '',
           githubUrl: raw.githubUrl ?? '',
@@ -366,6 +516,9 @@ export default function EditProjectPage() {
       const data = await response.json();
 
       if (data.success) {
+        // Clear any previous access errors
+        setAccessError(null);
+        
         // Add new team members if any were specified
         const membersToAdd = teamMembers.filter(member => member.userId && member.role);
         
@@ -375,7 +528,7 @@ export default function EditProjectPage() {
             // Validate userId before sending
             const idToUse = String(member.userId || '').trim();
             const looksLikeObjectId = /^[a-fA-F0-9]{24}$/.test(idToUse);
-            const selectedUser = users.find(u => u.id === idToUse);
+            const selectedUser = users.find(u => getUserId(u) === idToUse);
             if (!idToUse || !looksLikeObjectId || !selectedUser) {
               console.warn('Skipping invalid team member userId', { idToUse, looksLikeObjectId, hasSelectedUser: !!selectedUser });
               alert('Please select a valid user for the team member.');
@@ -425,22 +578,74 @@ export default function EditProjectPage() {
         
         router.push(`/projects/${params.id}`);
       } else {
-        alert(data.message || 'Failed to update project');
+        const errorMessage = data.error?.message || data.message || 'Failed to update project';
+        if (errorMessage.includes('Access denied') || errorMessage.includes('permission')) {
+          setAccessError(errorMessage);
+        } else {
+          alert(errorMessage);
+        }
       }
     } catch (error) {
       console.error('Error updating project:', error);
-      alert('Failed to update project');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update project';
+      if (errorMessage.includes('Access denied') || errorMessage.includes('permission')) {
+        setAccessError(errorMessage);
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const mentors = users.filter(user => user.role === 'mentor' || user.role === 'admin');
-  const teamLeaders = users.filter(user => 
-    user.role === 'team_leader' || 
-    user.role === 'admin' || 
-    user.role === 'team_member'
-  );
+  const mentors = users.filter(user => {
+    const role = (user.role || '').toLowerCase().trim();
+    return role === 'mentor' || role === 'admin' || role === 'researcher';
+  });
+  
+  const teamLeaders = users.filter(user => {
+    const userId = getUserId(user);
+    // Show ALL club members as potential team leaders (any authenticated user can be a team leader)
+    return userId; // Include all users with valid IDs
+  });
+  
+  // Debug logging
+  useEffect(() => {
+    if (users.length > 0) {
+      console.log('Edit Project - Total users fetched:', users.length);
+      console.log('Edit Project - Users with roles:', users.map(u => ({ id: getUserId(u), role: u.role, name: formatUserLabel(u) })));
+      console.log('Edit Project - Team leaders filtered:', teamLeaders.length);
+      console.log('Edit Project - Team leaders details:', teamLeaders.map(u => ({ id: getUserId(u), role: u.role, name: formatUserLabel(u) })));
+    }
+  }, [users, teamLeaders]);
+
+  // Debug logging for permission check (must be before any conditional returns)
+  useEffect(() => {
+    if (project && currentUser) {
+      const userId = getUserId(currentUser);
+      const leaderId = getProjectLeaderId(project as any);
+      const canEditValue = canManageProject(project as any, currentUser);
+      const isLeader = isProjectLeader(project as any, currentUser);
+      console.log('=== PERMISSION DEBUG ===');
+      console.log('Current User:', {
+        id: userId,
+        _id: (currentUser as any)._id,
+        role: currentUser.role,
+        fullUser: currentUser
+      });
+      console.log('Project:', {
+        id: (project as any).id,
+        teamLeaderId: (project as any).teamLeaderId,
+        teamLeaderIdType: typeof (project as any).teamLeaderId,
+        teamLeaderIdValue: (project as any).teamLeaderId
+      });
+      console.log('Extracted Leader ID:', leaderId);
+      console.log('IDs Match:', userId === leaderId);
+      console.log('Can Edit:', canEditValue);
+      console.log('Is Project Leader:', isLeader);
+      console.log('======================');
+    }
+  }, [project, currentUser]);
 
   if (fetchLoading) {
     return (
@@ -457,6 +662,34 @@ export default function EditProjectPage() {
       <AdminLayout pageTitle="Edit Project">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           Project not found
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // Check if user has permission to edit
+  const canEdit = canManageProject(project as any, currentUser);
+  
+  if (accessError || !canEdit) {
+    return (
+      <AdminLayout pageTitle="Edit Project">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center p-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-md shadow-sm"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+              <span className="ml-2 font-medium">Back</span>
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Edit Project</h1>
+              <p className="text-gray-600">Access Restricted</p>
+            </div>
+          </div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {accessError || 'You do not have permission to manage this project. Only project leaders, mentors, or admins can edit projects.'}
+          </div>
         </div>
       </AdminLayout>
     );
@@ -479,6 +712,14 @@ export default function EditProjectPage() {
             <p className="text-gray-600">Update project information</p>
           </div>
         </div>
+
+        {/* Access Error Display */}
+        {accessError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <p className="font-medium">Access Denied</p>
+            <p className="text-sm mt-1">{accessError}</p>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -689,11 +930,15 @@ export default function EditProjectPage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select Team Leader</option>
-                  {teamLeaders.map(user => (
-                    <option key={String(user.id)} value={String(user.id)}>
-                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
-                    </option>
-                  ))}
+                  {teamLeaders.map(user => {
+                    const id = getUserId(user);
+                    if (!id) return null;
+                    return (
+                      <option key={id} value={id}>
+                        {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -709,11 +954,15 @@ export default function EditProjectPage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select Mentor (Optional)</option>
-                  {mentors.map(user => (
-                    <option key={String(user.id)} value={String(user.id)}>
-                      {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
-                    </option>
-                  ))}
+                  {mentors.map(user => {
+                    const id = getUserId(user);
+                    if (!id) return null;
+                    return (
+                      <option key={id} value={id}>
+                        {formatUserLabel(user)}{user.email ? ` (${user.email})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
@@ -1031,7 +1280,7 @@ export default function EditProjectPage() {
                     if ((assignedObj as { fullName?: string })?.fullName) nameCandidates.push(String((assignedObj as { fullName?: string }).fullName));
                     if ((assignedObj as { displayName?: string })?.displayName) nameCandidates.push(String((assignedObj as { displayName?: string }).displayName));
                     if (assignedId && users.length > 0) {
-                      const matchUser = users.find(u => String(u.id) === String(assignedId));
+                      const matchUser = users.find(u => getUserId(u) === String(assignedId));
                       if (matchUser) nameCandidates.push(`${matchUser.firstName || ''} ${matchUser.lastName || ''}`.trim());
                     }
                     if (assignedId && existingMembers.length > 0) {
@@ -1164,9 +1413,15 @@ export default function EditProjectPage() {
                       className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="">Unassigned</option>
-                      {users.map(u => (
-                        <option key={u.id} value={u.id}>{formatUserLabel(u)}</option>
-                      ))}
+                      {users.map(u => {
+                        const id = getUserId(u);
+                        if (!id) return null;
+                        return (
+                          <option key={id} value={id}>
+                            {formatUserLabel(u)}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div className="flex gap-2">
