@@ -22,7 +22,8 @@ import {
   ClipboardDocumentListIcon,
   ClockIcon,
   HomeIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  CheckBadgeIcon
 } from '@heroicons/react/24/outline';
 import { NotificationDropdown } from './notifications/NotificationDropdown';
 import DeveloperCredit from './DeveloperCredit';
@@ -122,6 +123,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     { name: 'Research Areas', icon: AcademicCapIcon, href: '/research-areas' },
     { name: 'Audit Trail', icon: ClockIcon, href: '/audit-trail' },
     { name: 'Team', icon: UserGroupIcon, href: '/team' },
+    { name: 'Attendance', icon: CheckBadgeIcon, href: '/attendance' },
     { name: 'Media', icon: PhotoIcon, href: '/media' },
     { name: 'Users', icon: UsersIcon, href: '/users' },
     { name: 'Contact', icon: EnvelopeIcon, href: '/contact' },
@@ -152,6 +154,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     '/research-areas',
     '/audit-trail',
     '/team',
+    '/attendance',
     '/media',
     '/users',
     '/contact',
