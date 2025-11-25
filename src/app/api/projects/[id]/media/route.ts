@@ -4,10 +4,10 @@ import { getBackendUrl } from '@/config/backend';
 const backendUrl = getBackendUrl();
 
 interface ProjectMediaUpdatePayload {
-  imageUrl?: string;
-  videoUrl?: string;
-  githubUrl?: string;
-  documentationUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  githubUrl?: string | null;
+  documentationUrl?: string | null;
 }
 
 export async function PUT(
@@ -91,5 +91,6 @@ export async function PUT(
     );
   }
 }
+
 
 

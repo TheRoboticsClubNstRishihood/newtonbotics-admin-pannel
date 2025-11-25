@@ -32,7 +32,7 @@ export class NotificationService {
     });
 
     if (!response.ok) {
-      let errorData: NotificationApiError | any;
+      let errorData: NotificationApiError | { success: boolean; error?: { message: string; details?: Record<string, unknown> }; message?: string; timestamp?: string; path?: string; method?: string };
       try {
         errorData = await response.json();
       } catch {
@@ -49,8 +49,16 @@ export class NotificationService {
       }
       
       // Safely extract error message with fallbacks
+      const topLevelMessage =
+        typeof errorData === 'object' &&
+        errorData !== null &&
+        'message' in errorData &&
+        typeof (errorData as { message?: unknown }).message === 'string'
+          ? (errorData as { message: string }).message
+          : undefined;
+
       const errorMessage = errorData?.error?.message 
-        || errorData?.message 
+        || topLevelMessage
         || `HTTP error! status: ${response.status}`;
       
       throw new Error(errorMessage);

@@ -48,7 +48,9 @@ interface SimpleUser {
   _id?: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
   email?: string;
+  role?: string;
 }
 
 interface Pagination {
@@ -255,7 +257,7 @@ export default function MediaPage() {
       
       // Use club-members endpoint (accessible to any authenticated user, no role restriction)
       // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
-      let allRawUsers: any[] = [];
+      let allRawUsers: SimpleUser[] = [];
       const limit = 100;
       let skip = 0;
       let hasMore = true;
@@ -304,7 +306,7 @@ export default function MediaPage() {
       console.log(`Media: Total club members fetched: ${allRawUsers.length}`);
       
       // Normalize user IDs and format
-      const normalizedUsers = allRawUsers.map((user: any) => {
+      const normalizedUsers = allRawUsers.map((user: SimpleUser) => {
         const resolvedId = user.id || user._id || '';
         return {
           ...user,

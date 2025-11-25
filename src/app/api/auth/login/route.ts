@@ -53,7 +53,10 @@ export async function POST(request: NextRequest) {
               const projects = projectsData?.data?.projects || projectsData?.data?.items || projectsData?.projects || [];
               
               // Check if user is the team leader of any project
-              const isLeader = projects.some((project: any) => {
+              interface ProjectWithLeader {
+                teamLeaderId?: string | { _id?: string; id?: string };
+              }
+              const isLeader = projects.some((project: ProjectWithLeader) => {
                 const leaderId = typeof project.teamLeaderId === 'string' 
                   ? project.teamLeaderId 
                   : (project.teamLeaderId?._id || project.teamLeaderId?.id || '');

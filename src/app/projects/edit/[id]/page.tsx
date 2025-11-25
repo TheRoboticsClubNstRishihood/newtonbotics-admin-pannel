@@ -44,6 +44,7 @@ interface Project {
   documentationUrl?: string;
   achievements?: string[];
   tags?: string[];
+  [key: string]: unknown;
 }
 
 interface Milestone {
@@ -215,12 +216,12 @@ export default function EditProjectPage() {
       // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
       // Fetch all club members with pagination
       console.log('Edit Project: Fetching all club members with pagination...');
-      let allRawUsers: any[] = [];
+      const rawClubMembers: Array<Record<string, unknown>> = [];
       const limit = 100;
       let skip = 0;
       let hasMore = true;
       let response: Response;
-      let data: any;
+      let lastResponseData: { success?: boolean; data?: { clubMembers?: User[]; pagination?: { hasMore?: boolean } }; clubMembers?: User[]; message?: string; error?: { message?: string } | string } | null = null;
       let clubMembersSuccess = false;
 
       // Fetch all club members with pagination
@@ -233,7 +234,8 @@ export default function EditProjectPage() {
           }
         });
 
-        data = await response.json();
+        const data = await response.json();
+        lastResponseData = data;
         console.log(`Edit Project: Club-members API response status (skip=${skip}):`, response.status);
         console.log(`Edit Project: Club-members API response data:`, data);
 
@@ -253,8 +255,8 @@ export default function EditProjectPage() {
             console.log(`Edit Project: data.data keys:`, Object.keys(data.data));
           }
           
-          allRawUsers = [...allRawUsers, ...pageUsers];
-          console.log(`Edit Project: Fetched ${pageUsers.length} club members (total so far: ${allRawUsers.length})`);
+          rawClubMembers.push(...pageUsers);
+          console.log(`Edit Project: Fetched ${pageUsers.length} club members (total so far: ${rawClubMembers.length})`);
           
           // Check if there are more pages
           const pagination = data.data?.pagination;
@@ -264,7 +266,7 @@ export default function EditProjectPage() {
           
           // Only stop if we've fetched a reasonable amount OR if pagination says no more
           // Don't stop just because first page is empty - might be a response structure issue
-          if (allRawUsers.length >= 500) {
+          if (rawClubMembers.length >= 500) {
             hasMore = false;
           } else if (pageUsers.length === 0 && !hasMore) {
             // Only stop if no more pages AND no users on this page
@@ -280,12 +282,12 @@ export default function EditProjectPage() {
         }
       }
 
-      const rawUsers = allRawUsers;
+      const rawUsers = rawClubMembers;
       console.log('Edit Project: Total club members fetched:', rawUsers.length);
       
       // If club-members returned no data, log the full response for debugging
       if (!clubMembersSuccess || rawUsers.length === 0) {
-        console.error('Edit Project: Club-members endpoint returned no data. Full response:', data);
+        console.error('Edit Project: Club-members endpoint returned no data. Full response:', lastResponseData || 'No response data');
       }
 
       // Normalize user IDs
@@ -316,13 +318,20 @@ export default function EditProjectPage() {
         if (currentUser) {
           const userId = getUserId(currentUser);
           if (userId) {
+            interface CurrentUserWithDetails {
+              firstName?: string;
+              lastName?: string;
+              email?: string;
+              role?: string;
+            }
+            const userWithDetails = currentUser as CurrentUserWithDetails;
             setUsers([{
               id: userId,
               _id: userId,
-              firstName: (currentUser as any).firstName || '',
-              lastName: (currentUser as any).lastName || '',
-              email: (currentUser as any).email || '',
-              role: currentUser.role || 'team_member'
+              firstName: userWithDetails.firstName || '',
+              lastName: userWithDetails.lastName || '',
+              email: userWithDetails.email || '',
+              role: userWithDetails.role || 'team_member'
             } as User]);
             console.log('Edit Project: Added current user as fallback');
           }
@@ -335,13 +344,19 @@ export default function EditProjectPage() {
       if (currentUser) {
         const userId = getUserId(currentUser);
         if (userId) {
-          const userAny = currentUser as any;
+          interface CurrentUserWithDetails {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            role?: string;
+          }
+          const userWithDetails = currentUser as CurrentUserWithDetails;
           setUsers([{
             id: userId,
             _id: userId,
-            firstName: userAny.firstName || '',
-            lastName: userAny.lastName || '',
-            email: userAny.email || '',
+            firstName: userWithDetails.firstName || '',
+            lastName: userWithDetails.lastName || '',
+            email: userWithDetails.email || '',
             role: currentUser.role || 'team_member'
           } as User]);
         }
@@ -623,21 +638,26 @@ export default function EditProjectPage() {
   useEffect(() => {
     if (project && currentUser) {
       const userId = getUserId(currentUser);
-      const leaderId = getProjectLeaderId(project as any);
-      const canEditValue = canManageProject(project as any, currentUser);
-      const isLeader = isProjectLeader(project as any, currentUser);
+      const leaderId = getProjectLeaderId(project);
+      const canEditValue = canManageProject(project, currentUser);
+      const isLeader = isProjectLeader(project, currentUser);
       console.log('=== PERMISSION DEBUG ===');
+      interface CurrentUserWithId {
+        _id?: string;
+        role?: string;
+      }
+      const userWithId = currentUser as CurrentUserWithId;
       console.log('Current User:', {
         id: userId,
-        _id: (currentUser as any)._id,
+        _id: userWithId._id,
         role: currentUser.role,
         fullUser: currentUser
       });
       console.log('Project:', {
-        id: (project as any).id,
-        teamLeaderId: (project as any).teamLeaderId,
-        teamLeaderIdType: typeof (project as any).teamLeaderId,
-        teamLeaderIdValue: (project as any).teamLeaderId
+        id: project.id,
+        teamLeaderId: project.teamLeaderId,
+        teamLeaderIdType: typeof project.teamLeaderId,
+        teamLeaderIdValue: project.teamLeaderId
       });
       console.log('Extracted Leader ID:', leaderId);
       console.log('IDs Match:', userId === leaderId);
@@ -668,7 +688,7 @@ export default function EditProjectPage() {
   }
 
   // Check if user has permission to edit
-  const canEdit = canManageProject(project as any, currentUser);
+  const canEdit = canManageProject(project, currentUser);
   
   if (accessError || !canEdit) {
     return (

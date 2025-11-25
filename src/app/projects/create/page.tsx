@@ -21,6 +21,7 @@ import {
 
 interface User {
   id: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -127,12 +128,12 @@ export default function CreateProjectPage() {
       // This endpoint is available to team_member, admin, mentor, etc. - any authenticated user
       // Fetch all club members with pagination
       console.log('Fetching all club members with pagination...');
-      let allRawUsers: any[] = [];
+      const rawClubMembers: Array<Record<string, unknown>> = [];
       const limit = 100;
       let skip = 0;
       let hasMore = true;
       let response: Response;
-      let data: any;
+      let lastResponseData: { success?: boolean; data?: { clubMembers?: User[]; pagination?: { hasMore?: boolean } }; clubMembers?: User[]; message?: string; error?: { message?: string } | string } | null = null;
       let clubMembersSuccess = false;
 
       // Fetch all club members with pagination
@@ -145,7 +146,8 @@ export default function CreateProjectPage() {
           }
         });
 
-        data = await response.json();
+        const data = await response.json();
+        lastResponseData = data;
         console.log(`Club-members API response status (skip=${skip}):`, response.status);
         console.log(`Club-members API response data:`, data);
 
@@ -166,8 +168,8 @@ export default function CreateProjectPage() {
             console.log(`data.data keys:`, Object.keys(data.data));
           }
           
-          allRawUsers = [...allRawUsers, ...pageUsers];
-          console.log(`Fetched ${pageUsers.length} club members (total so far: ${allRawUsers.length})`);
+          rawClubMembers.push(...pageUsers);
+          console.log(`Fetched ${pageUsers.length} club members (total so far: ${rawClubMembers.length})`);
           
           // Check if there are more pages
           const pagination = data.data?.pagination;
@@ -177,7 +179,7 @@ export default function CreateProjectPage() {
           
           // Only stop if we've fetched a reasonable amount OR if pagination says no more
           // Don't stop just because first page is empty - might be a response structure issue
-          if (allRawUsers.length >= 500) {
+          if (rawClubMembers.length >= 500) {
             hasMore = false;
           } else if (pageUsers.length === 0 && !hasMore) {
             // Only stop if no more pages AND no users on this page
@@ -187,18 +189,19 @@ export default function CreateProjectPage() {
           skip += limit;
         } else {
           console.error(`Club-members API failed - status: ${response.status}, success: ${data.success}`);
-          console.error(`Error message:`, data.message || data.error?.message || data.error || 'Unknown error');
+          const errorMessage = data.message || (typeof data.error === 'string' ? data.error : data.error?.message) || 'Unknown error';
+          console.error(`Error message:`, errorMessage);
           console.error(`Full error response:`, data);
           hasMore = false;
         }
       }
 
-      const rawUsers = allRawUsers;
+      const rawUsers = rawClubMembers;
       console.log('Total club members fetched:', rawUsers.length);
       
       // If club-members returned no data, log the full response for debugging
       if (!clubMembersSuccess || rawUsers.length === 0) {
-        console.error('Club-members endpoint returned no data. Full response:', data);
+        console.error('Club-members endpoint returned no data. Full response:', lastResponseData || 'No response data');
       }
 
       // Normalize user IDs to handle both id and _id fields

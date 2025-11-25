@@ -61,6 +61,7 @@ interface Project {
   }>;
   createdAt: string;
   updatedAt: string;
+  [key: string]: unknown;
 }
 
 interface ProjectFilters {
