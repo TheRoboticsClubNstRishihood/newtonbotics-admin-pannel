@@ -88,7 +88,6 @@ export default function ProjectMediaForm({
           break;
         
         case 'documentation':
-          // Any valid HTTP/HTTPS URL is acceptable
           break;
       }
       
@@ -383,4 +382,5 @@ export default function ProjectMediaForm({
     </form>
   );
 }
+
 
