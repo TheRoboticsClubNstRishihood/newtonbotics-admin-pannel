@@ -29,6 +29,7 @@ interface Project {
   title: string;
   description: string;
   status: 'upcoming' | 'ongoing' | 'completed' | 'on_hold';
+  [key: string]: unknown;
   category?: string;
   startDate?: string;
   endDate?: string;
@@ -104,6 +105,8 @@ interface Project {
   }>;
   createdAt: string;
   updatedAt: string;
+  teamLeaderId?: string | { _id?: string; id?: string };
+  mentorId?: string | { _id?: string; id?: string };
 }
 
 interface TeamMemberDetails {
@@ -115,6 +118,55 @@ interface TeamMemberDetails {
   profileImageUrl?: string;
   bio?: string;
   skills?: string[];
+  department?: string;
+  role?: string;
+}
+
+interface MemberWithUser {
+  userId?: string | { id?: string; _id?: string; userId?: string };
+  user?: {
+    id?: string;
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    displayName?: string;
+    email?: string;
+    profileImageUrl?: string;
+    avatarUrl?: string;
+    bio?: string;
+    about?: string;
+    skills?: string[] | string;
+    department?: string;
+    role?: string;
+  };
+  id?: string;
+  _id?: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  skills?: string[] | string;
+  bio?: string;
+  department?: string;
+  profileImageUrl?: string;
+}
+
+interface ClubMember {
+  id?: string;
+  _id?: string;
+  userId?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  displayName?: string;
+  email?: string;
+  profileImageUrl?: string;
+  avatarUrl?: string;
+  bio?: string;
+  about?: string;
+  skills?: string[] | string;
   department?: string;
   role?: string;
 }
@@ -216,8 +268,15 @@ export default function ProjectDetailsPage() {
         const userIds = new Set<string>();
         
         // Extract user IDs from members
-        members.forEach((member: any) => {
-          const userId = member.userId || member.user?.id || member.user?._id || member.id || member._id;
+        members.forEach((member: MemberWithUser) => {
+          let userId: string | undefined;
+          if (typeof member.userId === 'string') {
+            userId = member.userId;
+          } else if (member.userId && typeof member.userId === 'object') {
+            userId = member.userId.id || member.userId._id || member.userId.userId;
+          } else {
+            userId = member.user?.id || member.user?._id || member.id || member._id;
+          }
           if (userId) {
             userIds.add(userId);
             
@@ -250,7 +309,7 @@ export default function ProjectDetailsPage() {
         
         if (missingUserIds.length > 0) {
           // Fetch all club members with pagination
-          let allClubMembers: any[] = [];
+          let allClubMembers: ClubMember[] = [];
           const limit = 100;
           let skip = 0;
           let hasMore = true;
@@ -284,7 +343,7 @@ export default function ProjectDetailsPage() {
           
           // Match missing user IDs with club members
           missingUserIds.forEach(userId => {
-            const user = allClubMembers.find((u: any) => (u.id || u._id) === userId);
+            const user = allClubMembers.find((u: ClubMember) => (u.id || u._id) === userId);
             if (user) {
               const firstName = user.firstName || user.fullName?.split(' ')[0] || '';
               const lastName = user.lastName || user.fullName?.split(' ').slice(1).join(' ') || '';
@@ -323,7 +382,7 @@ export default function ProjectDetailsPage() {
     // Extract unique user IDs from allTeamMembers
     const userIds = new Set<string>();
     allTeamMembers.forEach(member => {
-      const memberAny = member as any;
+      const memberAny = member as MemberWithUser;
       let userId: string | undefined;
       
       if (typeof memberAny.userId === 'string') {
@@ -346,7 +405,7 @@ export default function ProjectDetailsPage() {
     
     if (userIds.size > 0) {
       // Fetch all club members with pagination
-      let allClubMembers: any[] = [];
+      let allClubMembers: ClubMember[] = [];
       const limit = 100;
       let skip = 0;
       let hasMore = true;
@@ -380,7 +439,7 @@ export default function ProjectDetailsPage() {
       
           // Match user IDs with club members
           Array.from(userIds).forEach(userId => {
-            const user = allClubMembers.find((u: any) => {
+            const user = allClubMembers.find((u: ClubMember) => {
               const uId = u.id || u._id;
               const userIdStr = String(userId);
               const uIdStr = String(uId);
@@ -414,7 +473,7 @@ export default function ProjectDetailsPage() {
               console.warn('User not found in club members for allTeamMembers:', userId, 'Searched in', allClubMembers.length, 'members');
               // Log first few club member IDs for debugging
               if (allClubMembers.length > 0) {
-                console.log('Sample club member IDs:', allClubMembers.slice(0, 5).map((u: any) => u.id || u._id));
+                console.log('Sample club member IDs:', allClubMembers.slice(0, 5).map((u: ClubMember) => u.id || u._id));
               }
             }
           });
@@ -633,7 +692,7 @@ export default function ProjectDetailsPage() {
             <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(project.status || 'upcoming')}`}>
               {(project.status || 'upcoming').replace('_', ' ').toUpperCase()}
             </span>
-            {canManageProject(project as any, currentUser) && (
+            {canManageProject(project, currentUser) && (
               <>
                 <a
                   href={`/projects/edit/${project.id || ''}`}
@@ -741,32 +800,44 @@ export default function ProjectDetailsPage() {
                 {project.teamMembers && project.teamMembers.length > 0 ? (
                   <div className="space-y-4">
                     {project.teamMembers.map((member, index) => {
-                      const memberAny = member as any;
+                      const memberAny = member as MemberWithUser;
                       
                       // Extract userId - handle both string and object cases
                       let userId: string | undefined;
-                      let userData: any = null;
+                      let userData: ClubMember | MemberWithUser['user'] | null = null;
                       
                       if (typeof memberAny.userId === 'string') {
                         userId = memberAny.userId;
                       } else if (memberAny.userId && typeof memberAny.userId === 'object') {
                         // userId is an object with user data
-                        userData = memberAny.userId;
-                        userId = userData.id || userData._id || userData.userId;
+                        userData = memberAny.userId as ClubMember;
+                        userId = userData.id || userData._id || (userData as { userId?: string }).userId;
                       } else {
                         userId = memberAny.id || memberAny.user?.id || memberAny.user?._id;
                       }
                       
                       // Get user data from various sources
                       if (!userData) {
-                        userData = memberAny.user || memberAny.userId;
+                        userData = (memberAny.user || memberAny.userId) as ClubMember | null;
                       }
                       
                       const memberDetails = userId ? teamMemberDetails.get(userId) : null;
                       
                       // Also check allTeamMembers for name
+                      interface AllTeamMember {
+                        userId?: string | { id?: string; _id?: string };
+                        name?: string;
+                        role?: string;
+                      }
                       const allTeamMemberMatch = userId && project.allTeamMembers 
-                        ? project.allTeamMembers.find(m => m.userId === userId || (typeof m.userId === 'object' && (m.userId as any)?.id === userId))
+                        ? project.allTeamMembers.find((m: AllTeamMember) => {
+                            if (typeof m.userId === 'string') {
+                              return m.userId === userId;
+                            } else if (m.userId && typeof m.userId === 'object') {
+                              return m.userId.id === userId || m.userId._id === userId;
+                            }
+                            return false;
+                          })
                         : null;
                       
                       // Get name from various sources (prioritize: userData object, fetched details, allTeamMembers, then member data)
@@ -804,7 +875,8 @@ export default function ProjectDetailsPage() {
                       
                       const memberRole = memberAny.role || memberDetails?.role || allTeamMemberMatch?.role || 'Member';
                       const memberEmail = userData?.email || memberDetails?.email || memberAny.email;
-                      const memberSkills = userData?.skills || memberDetails?.skills || memberAny.skills || [];
+                      const memberSkillsRaw = userData?.skills || memberDetails?.skills || memberAny.skills || [];
+                      const memberSkills = Array.isArray(memberSkillsRaw) ? memberSkillsRaw : (typeof memberSkillsRaw === 'string' ? memberSkillsRaw.split(',') : []);
                       const memberBio = userData?.bio || memberDetails?.bio || memberAny.bio;
                       const memberDepartment = userData?.department || memberDetails?.department || memberAny.department;
                       const profileImageUrl = userData?.profileImageUrl || memberDetails?.profileImageUrl || memberAny.profileImageUrl;
@@ -881,7 +953,15 @@ export default function ProjectDetailsPage() {
                       .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
                       .map((member, index) => {
                         // Extract userId - handle both string and object cases
-                        const memberAny = member as any;
+                        interface AllTeamMemberItem {
+                          userId?: string | { id?: string; _id?: string; userId?: string };
+                          id?: string;
+                          _id?: string;
+                          name?: string;
+                          role?: string;
+                          joinedAt: string;
+                        }
+                        const memberAny = member as AllTeamMemberItem;
                         let userId: string | undefined;
                         
                         if (typeof memberAny.userId === 'string') {
@@ -1189,7 +1269,7 @@ export default function ProjectDetailsPage() {
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-medium text-gray-900">Resources</h3>
-                {canManageProject(project as any, currentUser) && (
+                {canManageProject(project, currentUser) && (
                   <button
                     onClick={() => setShowMediaForm(!showMediaForm)}
                     className="text-sm text-indigo-600 hover:text-indigo-900 flex items-center space-x-1"
@@ -1258,7 +1338,7 @@ export default function ProjectDetailsPage() {
               </div>
               
               {/* Media Management Form */}
-              {showMediaForm && canManageProject(project as any, currentUser) && (
+              {showMediaForm && canManageProject(project, currentUser) && (
                 <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                   <ProjectMediaForm
                     projectId={project.id || (params.id as string)}
