@@ -7,8 +7,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import AdminLayout from '@/components/AdminLayout';
 import { useToast } from '@/components/ToastContext';
 
@@ -136,9 +134,9 @@ export default function AttendancePage() {
 
       const list: ClubMemberResponse[] = data?.data?.clubMembers || data?.clubMembers || [];
       const normalized: AttendanceMemberOption[] = list
-        .filter((member) => member?.role === 'team_member')
+        .filter((member) => member?.role === 'team_member' && (member.id || member._id))
         .map((member) => {
-          const id = member.id || member._id;
+          const id = member.id || member._id || '';
           const name =
             member.displayName ||
             member.fullName ||
@@ -152,8 +150,7 @@ export default function AttendancePage() {
             department: member.department
           };
         })
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .filter((member): member is AttendanceMemberOption => Boolean(member.id));
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       setMembers(normalized);
     } catch (err) {
@@ -349,13 +346,18 @@ export default function AttendancePage() {
     return map[record.status] || 'P';
   }, []);
 
-  const handleDownloadPdf = useCallback(() => {
+  const handleDownloadPdf = useCallback(async () => {
     if (filteredMembers.length === 0) {
       showError('No team members to export.');
       return;
     }
 
-    const doc = new jsPDF({
+    const [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]);
+
+    const doc = new JsPDF({
       orientation: 'landscape',
       unit: 'pt',
       format: 'a4'
@@ -403,7 +405,7 @@ export default function AttendancePage() {
       },
       didDrawPage: (data) => {
         doc.setFontSize(9);
-        const pageText = `Page ${doc.internal.getNumberOfPages()}`;
+        const pageText = `Page ${doc.getNumberOfPages()}`;
         doc.text(pageText, data.settings.margin.left, doc.internal.pageSize.height - 10);
       }
     });
@@ -502,7 +504,7 @@ export default function AttendancePage() {
             <button
               type="button"
               onClick={handleDownloadPdf}
-              className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+              className="ml-auto inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
             >
               <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
               Download PDF
