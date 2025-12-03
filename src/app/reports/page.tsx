@@ -10,6 +10,41 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
+interface BackendUser {
+  id?: string;
+  _id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  department?: string;
+  studentId?: string;
+  phone?: string;
+  yearOfStudy?: number;
+  isActive?: boolean;
+  emailVerified?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  lastLogin?: string;
+  last_login?: string;
+}
+
+interface BackendProjectMember {
+  userId?: string | { _id?: string; id?: string };
+  id?: string;
+  role?: string;
+}
+
+interface BackendProject {
+  id?: string;
+  _id?: string;
+  title?: string;
+  status?: string;
+  teamLeaderId?: string | { _id?: string; id?: string };
+  allTeamMembers?: BackendProjectMember[];
+  teamMembers?: BackendProjectMember[];
+}
+
 interface StudentReport {
   id: string;
   firstName: string;
@@ -54,7 +89,7 @@ export default function ReportsPage() {
 
       // Fetch all users (students/team members)
       // Since the API might not support multiple roles, fetch all and filter client-side
-      let allUsers: any[] = [];
+      let allUsers: BackendUser[] = [];
       const limit = 100;
       let skip = 0;
       let hasMore = true;
@@ -74,13 +109,13 @@ export default function ReportsPage() {
         }
 
         const data = await response.json();
-        const users = data?.data?.users || data?.data?.items || data?.users || [];
+        const users: BackendUser[] = data?.data?.users || data?.data?.items || data?.users || [];
         
         if (users.length === 0) {
           hasMore = false;
         } else {
           // Filter for students and team_members only
-          const filteredUsers = users.filter((user: any) => {
+          const filteredUsers = users.filter((user: BackendUser) => {
             const role = user.role || '';
             return role === 'student' || role === 'team_member';
           });
@@ -93,7 +128,7 @@ export default function ReportsPage() {
       }
 
       // Fetch all projects to map user involvement
-      let allProjects: any[] = [];
+      let allProjects: BackendProject[] = [];
       try {
         const projectsResponse = await fetch('/api/projects?limit=1000', {
           headers: {
@@ -114,75 +149,93 @@ export default function ReportsPage() {
       }
 
       // Map users with their projects
-      const studentsWithProjects: StudentReport[] = allUsers.map((user) => {
-        const userId = user.id || user._id;
-        const userProjects: Array<{ id: string; title: string; role: string; status: string }> = [];
-
-        // Find projects where user is team leader or team member
-        allProjects.forEach((project) => {
-          const projectId = project.id || project._id;
-          
-          // Check if user is team leader
-          const leaderId = typeof project.teamLeaderId === 'string' 
-            ? project.teamLeaderId 
-            : (project.teamLeaderId?._id || project.teamLeaderId?.id || '');
-          
-          if (leaderId === userId) {
-            userProjects.push({
-              id: projectId,
-              title: project.title || 'Untitled',
-              role: 'Team Leader',
-              status: project.status || 'unknown'
-            });
-            return; // Skip team member check if already added as leader
+      const studentsWithProjects = allUsers
+        .map((user) => {
+          const userId = user.id || user._id;
+          if (!userId) {
+            // Skip users without a stable identifier
+            return null;
           }
 
-          // Check if user is a team member
-          const teamMembers = project.allTeamMembers || project.teamMembers || [];
-          teamMembers.forEach((member: any) => {
-            const memberId = typeof member.userId === 'string' 
-              ? member.userId 
-              : (member.userId?._id || member.userId?.id || member.id || '');
+          const userProjects: Array<{ id: string; title: string; role: string; status: string }> = [];
+
+          // Find projects where user is team leader or team member
+          allProjects.forEach((project: BackendProject) => {
+            const projectId = project.id || project._id;
+            if (!projectId) {
+              // Skip projects without a stable identifier
+              return;
+            }
             
-            if (memberId === userId && !userProjects.some(p => p.id === projectId)) {
+            // Check if user is team leader
+            const leaderId = typeof project.teamLeaderId === 'string' 
+              ? project.teamLeaderId 
+              : (project.teamLeaderId?._id || project.teamLeaderId?.id || '');
+            
+            if (leaderId === userId) {
               userProjects.push({
                 id: projectId,
                 title: project.title || 'Untitled',
-                role: member.role || 'Team Member',
+                role: 'Team Leader',
                 status: project.status || 'unknown'
               });
+              return; // Skip team member check if already added as leader
             }
-          });
-        });
 
-        return {
-          id: userId,
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          role: user.role || 'student',
-          department: user.department || '',
-          studentId: user.studentId || '',
-          phone: user.phone || '',
-          yearOfStudy: user.yearOfStudy,
-          isActive: user.isActive !== false,
-          emailVerified: user.emailVerified !== false,
-          projects: userProjects,
-          createdAt: user.createdAt || user.created_at || '',
-          lastLogin: user.lastLogin || user.last_login || ''
-        };
-      });
+            // Check if user is a team member
+            const teamMembers = project.allTeamMembers || project.teamMembers || [];
+            teamMembers.forEach((member: BackendProjectMember) => {
+              const memberId = typeof member.userId === 'string' 
+                ? member.userId 
+                : (member.userId?._id || member.userId?.id || member.id || '');
+              
+              if (memberId === userId && !userProjects.some(p => p.id === projectId)) {
+                userProjects.push({
+                  id: projectId,
+                  title: project.title || 'Untitled',
+                  role: member.role || 'Team Member',
+                  status: project.status || 'unknown'
+                });
+              }
+            });
+          });
+
+          return {
+            id: userId,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email || '',
+            role: user.role || 'student',
+            department: user.department || '',
+            studentId: user.studentId || '',
+            phone: user.phone || '',
+            yearOfStudy: user.yearOfStudy,
+            isActive: user.isActive !== false,
+            emailVerified: user.emailVerified !== false,
+            projects: userProjects,
+            createdAt: user.createdAt || user.created_at || '',
+            lastLogin: user.lastLogin || user.last_login || ''
+          };
+        })
+        .filter((student) => student !== null) as StudentReport[];
 
       setStudents(studentsWithProjects);
 
       // Extract unique departments and roles
-      const uniqueDepartments = [...new Set(studentsWithProjects.map(s => s.department).filter(Boolean))].sort();
+      const uniqueDepartments = [
+        ...new Set(
+          studentsWithProjects
+            .map((s) => s.department)
+            .filter((dept): dept is string => Boolean(dept))
+        ),
+      ].sort();
       const uniqueRoles = [...new Set(studentsWithProjects.map(s => s.role).filter(Boolean))].sort();
       setDepartments(uniqueDepartments);
       setRoles(uniqueRoles);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching students:', error);
-      const errorMessage = error?.message || 'Failed to load student reports';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load student reports';
       showError(errorMessage);
       setStudents([]); // Set empty array on error
     } finally {
