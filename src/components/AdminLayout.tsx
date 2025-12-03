@@ -21,7 +21,8 @@ import {
   ClockIcon,
   HomeIcon,
   AcademicCapIcon,
-  CheckBadgeIcon
+  CheckBadgeIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import DeveloperCredit from './DeveloperCredit';
 import { isUserProjectLeader } from '@/lib/projectPermissions';
@@ -108,6 +109,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     { name: 'Audit Trail', icon: ClockIcon, href: '/audit-trail' },
     { name: 'Team', icon: UserGroupIcon, href: '/team' },
     { name: 'Attendance', icon: CheckBadgeIcon, href: '/attendance' },
+    { name: 'Reports', icon: ChartBarIcon, href: '/reports' },
     { name: 'Media', icon: PhotoIcon, href: '/media' },
     { name: 'Users', icon: UsersIcon, href: '/users' },
     { name: 'Contact', icon: EnvelopeIcon, href: '/contact' },
@@ -139,6 +141,7 @@ export default function AdminLayout({ children, pageTitle = "Dashboard" }: Admin
     '/audit-trail',
     '/team',
     '/attendance',
+    '/reports',
     '/media',
     '/users',
     '/contact',

@@ -22,7 +22,7 @@ export default function DebugModal({ isOpen, onClose, user }: DebugModalProps) {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005'}/api/users/${user?.id}`, {
+      const response = await fetch(`/api/users/${user?.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

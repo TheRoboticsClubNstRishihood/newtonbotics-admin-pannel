@@ -65,7 +65,8 @@ interface UserStatistics {
 const USERS_PER_PAGE = 20;
 
 export default function Users() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // Store all users
+  const [users, setUsers] = useState<User[]>([]); // Displayed users (paginated)
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
     limit: USERS_PER_PAGE,
@@ -78,6 +79,7 @@ export default function Users() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'deactivated'>('active');
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,10 +97,9 @@ export default function Users() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchQuery, selectedRole, selectedDepartment, currentPage]);
+    // Reset to page 1 when filters change
+    setCurrentPage(1);
+  }, [searchQuery, selectedRole, selectedDepartment, activeTab]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -107,6 +108,7 @@ export default function Users() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  // Fetch all users at once
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
@@ -116,52 +118,105 @@ export default function Users() {
       }
 
       setErrorMessage(null);
+      setIsLoading(true);
 
-      const limit = USERS_PER_PAGE;
-      const skip = (currentPage - 1) * limit;
+      const basePath = activeTab === 'active' ? '/api/users' : '/api/users/deactivated';
+      
+      // Fetch all users with pagination
+      let allFetchedUsers: User[] = [];
+      const limit = 100; // Fetch in batches of 100
+      let skip = 0;
+      let hasMore = true;
 
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: limit.toString()
-      });
-      params.append('skip', skip.toString());
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          skip: skip.toString()
+        });
 
-      if (debouncedSearchQuery) params.append('q', debouncedSearchQuery);
-      if (selectedRole) params.append('role', selectedRole);
-      if (selectedDepartment) params.append('department', selectedDepartment);
+        const response = await fetch(`${basePath}?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      const response = await fetch(`/api/users?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+          const retryAfter = response.headers.get('Retry-After');
+          if (response.status === 429) {
+            const retryText = retryAfter ? `${retryAfter} seconds` : 'a moment';
+            setErrorMessage(`Too many requests. Please wait ${retryText} and try again.`);
+          } else {
+            const message = errorBody?.message || errorBody?.error || 'Failed to fetch users';
+            setErrorMessage(message);
+          }
+          console.error('Failed to fetch users', { status: response.status, body: errorBody });
+          break;
         }
-      });
 
-      if (response.ok) {
         const data = await response.json();
-        setUsers(data.data.users);
-        setPagination(data.data.pagination);
-        setErrorMessage(null);
-        return;
+        const batchUsers = data.data?.users || data.data?.items || data.users || [];
+        
+        if (batchUsers.length === 0) {
+          hasMore = false;
+        } else {
+          allFetchedUsers = [...allFetchedUsers, ...batchUsers];
+          const pagination = data.data?.pagination;
+          hasMore = pagination?.hasMore || batchUsers.length === limit;
+          skip += limit;
+        }
       }
 
-      const errorBody = await response.json().catch(() => null);
-      const retryAfter = response.headers.get('Retry-After');
-      if (response.status === 429) {
-        const retryText = retryAfter ? `${retryAfter} seconds` : 'a moment';
-        setErrorMessage(`Too many requests. Please wait ${retryText} and try again.`);
-      } else {
-        const message = errorBody?.message || errorBody?.error || 'Failed to fetch users';
-        setErrorMessage(message);
-      }
-      console.error('Failed to fetch users', { status: response.status, body: errorBody });
+      setAllUsers(allFetchedUsers);
+      setErrorMessage(null);
     } catch (error) {
       console.error('Error fetching users:', error);
       setErrorMessage('Unable to load users. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, selectedRole, selectedDepartment]);
+  }, [activeTab]);
+
+  // Filter and paginate users on the frontend
+  useEffect(() => {
+    let filtered = [...allUsers];
+
+    // Apply search filter
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter(user =>
+        `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.studentId?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply role filter
+    if (selectedRole) {
+      filtered = filtered.filter(user => user.role === selectedRole);
+    }
+
+    // Apply department filter
+    if (selectedDepartment) {
+      filtered = filtered.filter(user => user.department === selectedDepartment);
+    }
+
+    // Calculate pagination
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / USERS_PER_PAGE);
+    const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+    const endIndex = startIndex + USERS_PER_PAGE;
+    const paginatedUsers = filtered.slice(startIndex, endIndex);
+
+    setUsers(paginatedUsers);
+    setPagination({
+      total,
+      limit: USERS_PER_PAGE,
+      skip: startIndex,
+      hasMore: endIndex < total
+    });
+  }, [allUsers, debouncedSearchQuery, selectedRole, selectedDepartment, currentPage]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -186,54 +241,20 @@ export default function Users() {
     }
   }, []);
 
-  const fetchDepartments = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
-
-      const response = await fetch(`/api/users/departments`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDepartments(data.data.departments);
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error);
+  // Extract departments and roles from allUsers
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      const uniqueDepartments = [...new Set(allUsers.map(u => u.department).filter(Boolean))].sort() as string[];
+      const uniqueRoles = [...new Set(allUsers.map(u => u.role).filter(Boolean))].sort() as string[];
+      setDepartments(uniqueDepartments);
+      setRoles(uniqueRoles);
     }
-  }, []);
-
-  const fetchRoles = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
-
-      const response = await fetch(`/api/users/roles`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRoles(data.data.roles);
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-    }
-  }, []);
+  }, [allUsers]);
 
   useEffect(() => {
     fetchUsers();
     fetchStatistics();
-    fetchDepartments();
-    fetchRoles();
-  }, [fetchUsers, fetchStatistics, fetchDepartments, fetchRoles]);
+  }, [fetchUsers, fetchStatistics]);
 
   const handleDeactivateUser = async (userId: string) => {
     if (!confirm('Are you sure you want to deactivate this user?')) return;
@@ -404,9 +425,35 @@ export default function Users() {
           </div>
         )}
 
-        {/* Search and Filters */}
+        {/* Tabs + Search and Filters */}
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="p-6">
+            {/* Tabs */}
+            <div className="mb-4 border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                <button
+                  onClick={() => setActiveTab('active')}
+                  className={`whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium ${
+                    activeTab === 'active'
+                      ? 'border-indigo-500 text-indigo-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Active Users
+                </button>
+                <button
+                  onClick={() => setActiveTab('deactivated')}
+                  className={`whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium ${
+                    activeTab === 'deactivated'
+                      ? 'border-indigo-500 text-indigo-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Deactivated Users
+                </button>
+              </nav>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
               <div className="flex-1">
