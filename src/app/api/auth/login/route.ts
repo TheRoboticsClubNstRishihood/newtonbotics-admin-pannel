@@ -28,22 +28,28 @@ export async function POST(request: NextRequest) {
       });
       
       clearTimeout(timeoutId);
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
       // Handle network errors (connection refused, timeout, etc.)
       console.error('Fetch error:', fetchError);
-      console.error('Error name:', fetchError?.name);
-      console.error('Error message:', fetchError?.message);
-      console.error('Error code:', fetchError?.code);
+
+      const errorDetails =
+        fetchError && typeof fetchError === 'object'
+          ? (fetchError as { name?: string; message?: string; code?: string })
+          : {};
+
+      console.error('Error name:', errorDetails.name);
+      console.error('Error message:', errorDetails.message);
+      console.error('Error code:', errorDetails.code);
       
       let errorMessage = 'Unable to connect to backend server';
-      if (fetchError.name === 'AbortError') {
+      if (errorDetails.name === 'AbortError') {
         errorMessage = 'Backend server request timed out (10 seconds)';
-      } else if (fetchError.code === 'ECONNREFUSED' || fetchError.message?.includes('ECONNREFUSED')) {
+      } else if (errorDetails.code === 'ECONNREFUSED' || errorDetails.message?.includes('ECONNREFUSED')) {
         errorMessage = `Backend server is not running or not accessible at ${backendUrl}`;
-      } else if (fetchError.message?.includes('fetch failed')) {
+      } else if (errorDetails.message?.includes('fetch failed')) {
         errorMessage = `Failed to connect to backend at ${backendUrl}. Please check if the server is running.`;
-      } else if (fetchError.message) {
-        errorMessage = `Network error: ${fetchError.message}`;
+      } else if (errorDetails.message) {
+        errorMessage = `Network error: ${errorDetails.message}`;
       }
       
       return NextResponse.json(
