@@ -263,6 +263,37 @@ export default function AttendancePage() {
     const cellKey = `${userId}-${dateKey}`;
     setPendingCell(cellKey);
 
+    // Get existing record before optimistic update (needed for delete operation)
+    const existingRecord = attendanceIndex.get(cellKey);
+
+    // Optimistically update the UI
+    let optimisticRecord: AttendanceRecord | null = null;
+    if (checked) {
+      // Optimistically add the record
+      optimisticRecord = {
+        userId,
+        date: dateKey,
+        status: 'present'
+      };
+      setRecords(prev => {
+        // Check if record already exists to avoid duplicates
+        const exists = prev.some(r => {
+          const rUserId = getRecordUserId(r);
+          const rDate = isoToDateKey(r.date);
+          return rUserId === userId && rDate === dateKey;
+        });
+        if (exists) return prev;
+        return [...prev, optimisticRecord!];
+      });
+    } else {
+      // Optimistically remove the record
+      setRecords(prev => prev.filter(r => {
+        const rUserId = getRecordUserId(r);
+        const rDate = isoToDateKey(r.date);
+        return !(rUserId === userId && rDate === dateKey);
+      }));
+    }
+
     try {
       if (checked) {
         const response = await fetch('/api/attendance', {
@@ -279,14 +310,32 @@ export default function AttendancePage() {
         });
 
         if (!response.ok) {
+          // Revert optimistic update on error
+          setRecords(prev => prev.filter(r => {
+            const rUserId = getRecordUserId(r);
+            const rDate = isoToDateKey(r.date);
+            return !(rUserId === userId && rDate === dateKey);
+          }));
           const data = await response.json().catch(() => null);
           showError(data?.message || 'Failed to mark attendance');
           return;
         }
 
+        // Update with the actual response data if available
+        const data = await response.json().catch(() => null);
+        if (data?.data?.attendance) {
+          setRecords(prev => {
+            const filtered = prev.filter(r => {
+              const rUserId = getRecordUserId(r);
+              const rDate = isoToDateKey(r.date);
+              return !(rUserId === userId && rDate === dateKey);
+            });
+            return [...filtered, data.data.attendance];
+          });
+        }
+
         showSuccess('Attendance marked');
       } else {
-        const existingRecord = attendanceIndex.get(cellKey);
         if (!existingRecord) {
           setPendingCell(null);
           return;
@@ -294,6 +343,16 @@ export default function AttendancePage() {
 
         const recordId = existingRecord.id || existingRecord._id;
         if (!recordId) {
+          // Revert optimistic update
+          setRecords(prev => {
+            const exists = prev.some(r => {
+              const rUserId = getRecordUserId(r);
+              const rDate = isoToDateKey(r.date);
+              return rUserId === userId && rDate === dateKey;
+            });
+            if (exists) return prev;
+            return [...prev, existingRecord];
+          });
           showError('Unable to find attendance record ID to remove');
           return;
         }
@@ -306,6 +365,16 @@ export default function AttendancePage() {
         });
 
         if (!response.ok) {
+          // Revert optimistic update on error
+          setRecords(prev => {
+            const exists = prev.some(r => {
+              const rUserId = getRecordUserId(r);
+              const rDate = isoToDateKey(r.date);
+              return rUserId === userId && rDate === dateKey;
+            });
+            if (exists) return prev;
+            return [...prev, existingRecord];
+          });
           const data = await response.json().catch(() => null);
           showError(data?.message || 'Failed to clear attendance');
           return;
@@ -313,15 +382,34 @@ export default function AttendancePage() {
 
         showSuccess('Attendance cleared');
       }
-
-      await fetchAttendance();
     } catch (err) {
+      // Revert optimistic update on error
       console.error('Failed to toggle attendance', err);
+      if (checked) {
+        setRecords(prev => prev.filter(r => {
+          const rUserId = getRecordUserId(r);
+          const rDate = isoToDateKey(r.date);
+          return !(rUserId === userId && rDate === dateKey);
+        }));
+      } else {
+        const existingRecord = attendanceIndex.get(cellKey);
+        if (existingRecord) {
+          setRecords(prev => {
+            const exists = prev.some(r => {
+              const rUserId = getRecordUserId(r);
+              const rDate = isoToDateKey(r.date);
+              return rUserId === userId && rDate === dateKey;
+            });
+            if (exists) return prev;
+            return [...prev, existingRecord];
+          });
+        }
+      }
       showError('Something went wrong while updating attendance');
     } finally {
       setPendingCell(null);
     }
-  }, [allowPastEditing, attendanceIndex, fetchAttendance, showError, showSuccess]);
+  }, [allowPastEditing, attendanceIndex, showError, showSuccess]);
 
   const filteredMembers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -370,13 +458,57 @@ export default function AttendancePage() {
       ['Team member', ...dayNumbers.map((day) => day.toString())]
     ];
 
+    // Pre-calculate which days have no attendance marked at all
+    // If all members have no record for a day, that day's attendance wasn't taken
+    const daysWithNoAttendance = new Set<number>();
+    dayNumbers.forEach((day) => {
+      const dateKey = getDateKey(selectedMonth.year, selectedMonth.month, day);
+      const cellDate = new Date(dateKey);
+      cellDate.setHours(0, 0, 0, 0);
+      const isFutureDate = cellDate > today;
+      
+      // Skip future dates
+      if (isFutureDate) return;
+      
+      // Check if ANY member has a record for this day
+      const hasAnyRecord = filteredMembers.some((member) => {
+        const recordKey = `${member.id}-${dateKey}`;
+        return attendanceIndex.has(recordKey);
+      });
+      
+      // If no one has a record, attendance wasn't marked for this day
+      if (!hasAnyRecord) {
+        daysWithNoAttendance.add(day);
+      }
+    });
+
     const body = filteredMembers.map((member) => {
       const row: (string | number)[] = [`${member.name}\n${member.email}`];
       dayNumbers.forEach((day) => {
         const dateKey = getDateKey(selectedMonth.year, selectedMonth.month, day);
         const recordKey = `${member.id}-${dateKey}`;
         const record = attendanceIndex.get(recordKey);
-        row.push(getStatusSymbol(record));
+        
+        // Check if this is a future date
+        const cellDate = new Date(dateKey);
+        cellDate.setHours(0, 0, 0, 0);
+        const isFutureDate = cellDate > today;
+        
+        // Determine the symbol to show:
+        // - If record exists: show status symbol
+        // - If future date: empty
+        // - If day has no attendance marked (all absent): empty (attendance not taken)
+        // - Otherwise: "A" (Absent)
+        let symbol = '';
+        if (record) {
+          symbol = getStatusSymbol(record);
+        } else if (!isFutureDate && !daysWithNoAttendance.has(day)) {
+          // Past/current date with attendance marked for some members, but this member is absent
+          symbol = 'A';
+        }
+        // If isFutureDate or daysWithNoAttendance.has(day), symbol remains empty
+        
+        row.push(symbol);
       });
       return row;
     });
@@ -396,11 +528,17 @@ export default function AttendancePage() {
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index > 0) {
-          const value = data.cell.text?.[0];
+          const value = data.cell.text?.[0] || '';
           if (value === 'P') {
+            // Present - Green background with dark green text
             data.cell.styles.fillColor = [198, 239, 206];
             data.cell.styles.textColor = [0, 97, 0];
+          } else if (value === 'A') {
+            // Absent - Red background with dark red text
+            data.cell.styles.fillColor = [255, 199, 206];
+            data.cell.styles.textColor = [156, 0, 6];
           }
+          // Empty cells for future dates are left blank (no styling)
         }
       },
       didDrawPage: (data) => {
